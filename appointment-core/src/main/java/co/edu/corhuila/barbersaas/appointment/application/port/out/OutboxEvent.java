@@ -1,6 +1,8 @@
 package co.edu.corhuila.barbersaas.appointment.application.port.out;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -13,7 +15,8 @@ public record OutboxEvent(UUID id, UUID aggregateId, String type, Map<String, Ob
 
     public static final String AGGREGATE_TYPE = "appointment";
 
+    /** A copy that keeps the order and allows null values: a walk-in has no clientId. */
     public OutboxEvent {
-        payload = Map.copyOf(payload);
+        payload = Collections.unmodifiableMap(new LinkedHashMap<>(payload));
     }
 }
