@@ -23,5 +23,6 @@
 
   <modules>
     <module>appointment-core</module>
+    <module>appointment-adapters</module>
   </modules>
 </project>
