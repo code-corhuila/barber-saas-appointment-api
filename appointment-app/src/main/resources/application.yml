@@ -1,0 +1,34 @@
+server:
+  port: ${PORT:8080}
+  shutdown: graceful            # stop accepting, let in-flight requests finish
+  tomcat:
+    connection-timeout: 5s      # time to receive the request line and headers
+    keep-alive-timeout: 60s
+    threads:
+      max: 200
+spring:
+  application:
+    name: appointment-api
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  autoconfigure:
+    # The pool is built in AppointmentConfiguration (the composition root), not by auto-configuration.
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  jackson:
+    # Optional fields absent from the contract's responses are sent as null, never dropped silently.
+    default-property-inclusion: always
+logging:
+  structured:
+    format:
+      console: ecs              # one JSON object per line; the MDC adds correlationId
+appointment:
+  database:
+    # Empty: in-memory repository. The schema lives in barber-saas-appointment-db; this service never migrates it.
+    url: ${DATABASE_URL:}
+    user: ${DATABASE_USER:}
+    password: ${DATABASE_PASSWORD:}
+    pool-max: ${DB_POOL_MAX:10}
+    statement-timeout-ms: ${DB_STATEMENT_TIMEOUT_MS:5000}
+  # The other domains, always through their APIs (golden rule 8, Annex J J.3.3).
+  barbershop-api-url: ${BARBERSHOP_API_URL:http://barbershop-api:8080}
+  schedule-api-url: ${SCHEDULE_API_URL:http://schedule-api:8080}
