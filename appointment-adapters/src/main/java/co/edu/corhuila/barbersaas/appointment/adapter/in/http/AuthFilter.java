@@ -10,7 +10,10 @@ import java.time.Instant;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Validates the bearer token on every route under /api/: nothing in appointment-service.yaml is anonymous. */
+/**
+ * Validates the bearer token on every route under /api/ (nothing in appointment-service.yaml is
+ * anonymous) and under /internal/ (authentication.md, "Internal operations": never anonymous).
+ */
 public class AuthFilter extends OncePerRequestFilter {
 
     public static final String CALLER_ATTRIBUTE = "auth.caller";
@@ -25,7 +28,8 @@ public class AuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/");
+        String path = request.getRequestURI();
+        return !path.startsWith("/api/") && !path.startsWith("/internal/");
     }
 
     @Override
