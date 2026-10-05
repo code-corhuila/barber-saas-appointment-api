@@ -41,6 +41,7 @@ that is `barber-saas-appointment-db`.
 | `GET /api/v1/appointments?page&limit&status&barberId&date`, `GET …/{id}` | `CLIENT` only their own; staff the whole barbershop |
 | `POST …/{id}/confirm`, `/start`, `/complete`, `/no-show` | `ADMIN_BARBERSHOP`, `BARBER` |
 | `POST …/{id}/cancel` | `CLIENT` their own, outside the barbershop's window; staff always |
+| `GET /internal/v1/busy-slots?barbershopId&barberId&date` (internal network only) | the service token of `barber-saas-schedule-api` only |
 | `GET /health` | liveness, no token |
 
 Rules: the end and the price come from the service and the price never changes afterwards
@@ -51,6 +52,14 @@ barber never overlap — checked by the service for a clean `422` and guaranteed
 (INV-APPT-004); a client cancels only before `start − cancellationPolicyHours`, in the
 barbershop's time zone (INV-APPT-003). The tenant comes **only** from the token: another
 barbershop's appointment, barber or service answers `404` (HU-TENANT-001 #13).
+
+**Busy slots for schedule (`DEC-APPT-05`, ADR-015):** `GET /internal/v1/busy-slots` lives under
+`/internal/v1`, which the api-gateway never routes, and accepts **only** a token with `role: SERVICE`
+and `sub: barber-saas-schedule-api` — any other token answers `403`, none `401`. It returns
+`{"data":[{"startTime","endTime"}]}`: the `PENDING`, `CONFIRMED` and `IN_PROGRESS` appointments of
+that barber, date and barbershop, ordered by `startTime`, and nothing else (no ids, client, service
+or notes). An unknown barber or one of another barbershop is an empty list. schedule-api takes the
+`barbershopId` from its caller's token, so availability is the same for every role.
 
 **Other domains, through their APIs (golden rule 8):** price, duration, time zone and cancellation
 window from `barbershop-api`; free slots from `schedule-api`. Each call carries the caller's token
@@ -92,12 +101,8 @@ and `TEST_DATABASE_PASSWORD` are set.
 
 ### What is missing
 
-- **btree_gist.** The no-double-booking constraint needs the extension; `barber-saas-infra` must
-  create it in `postgres/init/01-instance.sh` (extensions belong to the instance, Annex J J.4).
-- **Clients and OQ-07.** A `CLIENT` token carries no barbershop, so booking answers `403` to clients
-  until OQ-07 decides how a client is bound to a barbershop (in development, `dev-token.sh` can add it).
-- **Service token.** Calls to barbershop-api and schedule-api forward the caller's token: their
-  operations require a user role with a barbershop, which a `SERVICE` token does not carry.
+- **Outbound token.** Calls to barbershop-api and schedule-api forward the caller's token (a
+  client's is bound to the barbershop since `DEC-AUTH-06`): their operations take the tenant from it.
 - **Publishing the outbox.** Events are stored but not yet published: the transport is open (AT-004).
 - **Not in this contract yet:** reschedule, reward coupons applied at booking, and the reminder and
   automatic no-show jobs of the prototype (the worker's).
