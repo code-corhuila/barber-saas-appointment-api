@@ -112,4 +112,20 @@ abstract class RepositoryContract {
         assertEquals(0, repository().page(UUID.randomUUID(), new Query(null, null, null, null),
                 new Page.Request(1, 10)).total());
     }
+
+    @Test
+    void theBusySlotsAreTheActiveTimesOfThatBarberAndDateInThatBarbershopInStartOrder() {
+        Appointment late = at(LocalTime.of(15, 30));
+        repository().saveNew(late, key(), List.of());
+        Appointment early = at(LocalTime.of(8, 0));
+        repository().saveNew(early, key(), List.of());
+        Appointment cancelled = at(LocalTime.of(12, 0));
+        repository().saveNew(cancelled, key(), List.of());
+        cancelled.cancel(null, false, 0, LocalDateTime.now(), now);
+        repository().update(cancelled, List.of());
+
+        assertEquals(List.of(early.slot(), late.slot()), repository().busy(shop, barber, day));
+        assertTrue(repository().busy(UUID.randomUUID(), barber, day).isEmpty(), "another barbershop");
+        assertTrue(repository().busy(shop, barber, day.plusDays(1)).isEmpty(), "another date");
+    }
 }
