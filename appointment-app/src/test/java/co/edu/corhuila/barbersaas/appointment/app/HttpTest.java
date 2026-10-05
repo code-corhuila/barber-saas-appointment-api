@@ -48,8 +48,17 @@ abstract class HttpTest {
 
     /** "Bearer ..." for a user with that role; {@code barbershopId} null for CLIENT and SUPER_ADMIN. */
     static String bearer(UUID userId, String role, UUID barbershopId) {
+        return signed(userId.toString(), role, barbershopId);
+    }
+
+    /** "Bearer ..." for a service token: role SERVICE, the service's name as sub, no barbershop. */
+    static String serviceBearer(String service) {
+        return signed(service, "SERVICE", null);
+    }
+
+    private static String signed(String subject, String role, UUID barbershopId) {
         long now = Instant.now().getEpochSecond();
-        String claims = "{\"iss\":\"barber-saas-identity-auth-api\",\"sub\":\"" + userId + "\",\"role\":\"" + role + "\""
+        String claims = "{\"iss\":\"barber-saas-identity-auth-api\",\"sub\":\"" + subject + "\",\"role\":\"" + role + "\""
                 + (barbershopId == null ? "" : ",\"barbershopId\":\"" + barbershopId + "\"")
                 + ",\"iat\":" + now + ",\"exp\":" + (now + 600) + "}";
         try {
