@@ -78,6 +78,16 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
     }
 
     @Override
+    public List<Slot> busy(UUID tenant, UUID barberId, LocalDate date) {
+        return jdbc.query("SELECT appointment_date, start_time, end_time FROM appointment.appointment "
+                        + "WHERE barbershop_id = ? AND barber_id = ? AND appointment_date = ? "
+                        + "AND status IN ('PENDING', 'CONFIRMED', 'IN_PROGRESS') ORDER BY start_time",
+                (rs, n) -> new Slot(rs.getObject("appointment_date", LocalDate.class),
+                        rs.getObject("start_time", LocalTime.class), rs.getObject("end_time", LocalTime.class)),
+                tenant, barberId, date);
+    }
+
+    @Override
     public boolean overlaps(UUID barberId, Slot slot) {
         Boolean found = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM appointment.appointment "
                         + "WHERE barber_id = ? AND appointment_date = ? AND status NOT IN ('CANCELLED', 'NO_SHOW') "

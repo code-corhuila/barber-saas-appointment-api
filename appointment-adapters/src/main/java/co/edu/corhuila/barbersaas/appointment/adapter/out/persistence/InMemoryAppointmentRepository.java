@@ -6,6 +6,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,14 @@ public class InMemoryAppointmentRepository implements AppointmentRepository {
                 .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).reversed()
                         .thenComparing(Appointment::id))
                 .toList(), page);
+    }
+
+    @Override
+    public List<Slot> busy(UUID tenant, UUID barberId, LocalDate date) {
+        return rows.values().stream()
+                .filter(a -> a.barbershopId().equals(tenant) && a.barberId().equals(barberId))
+                .filter(a -> a.slot().date().equals(date) && a.status().isOpen())
+                .map(Appointment::slot).sorted(Comparator.comparing(Slot::start)).toList();
     }
 
     @Override
