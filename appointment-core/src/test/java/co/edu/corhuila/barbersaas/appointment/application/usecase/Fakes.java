@@ -56,6 +56,14 @@ final class Fakes {
         }
 
         @Override
+        public List<Slot> busy(UUID tenant, UUID barberId, LocalDate date) {
+            return rows.values().stream()
+                    .filter(a -> a.barbershopId().equals(tenant) && a.barberId().equals(barberId))
+                    .filter(a -> a.slot().date().equals(date) && a.status().isOpen())
+                    .map(Appointment::slot).sorted(Comparator.comparing(Slot::start)).toList();
+        }
+
+        @Override
         public boolean overlaps(UUID barberId, Slot slot) {
             return rows.values().stream().anyMatch(a -> a.barberId().equals(barberId) && a.takesTime()
                     && a.slot().overlaps(slot));
