@@ -39,6 +39,16 @@ public record Caller(String subject, Role role, UUID barbershopId, String creden
         return role == r;
     }
 
+    /**
+     * Internal operations accept only the service token of the one service they exist for
+     * (authentication.md, "Internal operations"): a user's token, or another service's, is refused.
+     */
+    public void requireService(String service) {
+        if (role != Role.SERVICE || !subject.equals(service)) {
+            throw new Forbidden("Only " + service + " can do this");
+        }
+    }
+
     /** The user id of the token; a service token has a service name instead. */
     public UUID userId() {
         try {
