@@ -10,10 +10,12 @@ import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.JdbcAppoin
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.SystemClock;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.UuidGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUseCases;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.BusySlotUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarberAvailability;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.ManageAppointments;
+import co.edu.corhuila.barbersaas.appointment.application.usecase.QueryBusySlots;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -73,6 +75,11 @@ public class AppointmentConfiguration {
     AppointmentUseCases appointmentUseCases(AppointmentRepository appointments, BarbershopCatalog catalog,
                                             BarberAvailability availability) {
         return new ManageAppointments(appointments, catalog, availability, new SystemClock(), new UuidGenerator());
+    }
+
+    @Bean
+    BusySlotUseCases busySlotUseCases(AppointmentRepository appointments) {
+        return new QueryBusySlots(appointments);
     }
 
     /** JWT_PUBLIC_KEY: the PEM itself; a one-line value with literal \n escapes, as an env file holds it, is accepted. */
