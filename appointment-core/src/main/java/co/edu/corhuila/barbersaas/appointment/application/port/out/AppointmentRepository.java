@@ -34,6 +34,9 @@ public interface AppointmentRepository {
     /** Most recent first: date, then start time, descending. */
     Page<Appointment> page(UUID tenant, Query query, Page.Request page);
 
+    /** The slots of the barber's PENDING, CONFIRMED and IN_PROGRESS appointments that date, by start. */
+    List<Slot> busy(UUID tenant, UUID barberId, LocalDate date);
+
     /** True when an active appointment of the barber overlaps the slot (a clean 422 before the insert). */
     boolean overlaps(UUID barberId, Slot slot);
 
