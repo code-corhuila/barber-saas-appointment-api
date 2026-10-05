@@ -8,4 +8,9 @@ public enum AppointmentStatus {
     public boolean takesTime() {
         return this != CANCELLED && this != NO_SHOW;
     }
+
+    /** Still ahead or under way: what availability subtracts (DEC-APPT-05). COMPLETED is history. */
+    public boolean isOpen() {
+        return this == PENDING || this == CONFIRMED || this == IN_PROGRESS;
+    }
 }
