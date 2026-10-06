@@ -4,19 +4,23 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Money;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.MDC;
@@ -29,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * read filters by the barbershop. ex_appointment_no_double_booking is the final guarantee against
  * double booking: its violation becomes SlotTaken, which the use case answers with 422.
  */
-public class JdbcAppointmentRepository implements AppointmentRepository {
+public class JdbcAppointmentRepository implements AppointmentRepository, OutboxStore {
 
     private static final String COLUMNS = "id, barbershop_id, client_id, barber_id, service_id, appointment_date, "
             + "start_time, end_time, status, price_at_booking_cents, notes, cancelled_reason, created_by, "
@@ -161,6 +165,37 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
                             + "correlation_id, occurred_at) VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)",
                     e.id(), OutboxEvent.AGGREGATE_TYPE, e.aggregateId(), e.type(), toJson(e), correlationId,
                     Timestamp.from(e.occurredAt()));
+        }
+    }
+
+    /** idx_outbox_event_unpublished serves this read: pending only, oldest first. */
+    @Override
+    public List<Stored> pending(int limit) {
+        return jdbc.query("SELECT id, aggregate_id, event_type, payload::text AS payload, correlation_id, occurred_at "
+                        + "FROM appointment.outbox_event WHERE published_at IS NULL AND failed_at IS NULL "
+                        + "ORDER BY occurred_at, id LIMIT ?",
+                (rs, n) -> new Stored(new OutboxEvent(rs.getObject("id", UUID.class), rs.getObject("aggregate_id", UUID.class),
+                        rs.getString("event_type"), fromJson(rs.getString("payload")),
+                        rs.getTimestamp("occurred_at").toInstant()), rs.getString("correlation_id")), limit);
+    }
+
+    @Override
+    public boolean markPublished(UUID id, Instant now) {
+        return jdbc.update("UPDATE appointment.outbox_event SET published_at = coalesce(published_at, ?) WHERE id = ?",
+                Timestamp.from(now), id) == 1;
+    }
+
+    @Override
+    public boolean markFailed(UUID id, String reason, Instant now) {
+        return jdbc.update("UPDATE appointment.outbox_event SET failed_at = coalesce(failed_at, ?), last_error = ? "
+                + "WHERE id = ?", Timestamp.from(now), reason, id) == 1;
+    }
+
+    private Map<String, Object> fromJson(String payload) {
+        try {
+            return json.readValue(payload, new TypeReference<Map<String, Object>>() { });
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("A stored payload is not JSON", ex);
         }
     }
 
