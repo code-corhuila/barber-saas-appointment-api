@@ -51,7 +51,10 @@ barber never overlap — checked by the service for a clean `422` and guaranteed
 `08-diagrams/uml/state-appointment.md` are allowed, anything else is `422 INVALID_STATUS_TRANSITION`
 (INV-APPT-004); a client cancels only before `start − cancellationPolicyHours`, in the
 barbershop's time zone (INV-APPT-003). The tenant comes **only** from the token: another
-barbershop's appointment, barber or service answers `404` (HU-TENANT-001 #13).
+barbershop's appointment, barber or service answers `404` (HU-TENANT-001 #13). The single
+exception (`DEC-APPT-06`): a client whose token carries no barbershop lists their own
+appointments of every barbershop, filtered by the token's `sub`; each one returns its
+`barbershopId`, output only.
 
 **Busy slots for schedule (`DEC-APPT-05`, ADR-015):** `GET /internal/v1/busy-slots` lives under
 `/internal/v1`, which the api-gateway never routes, and accepts **only** a token with `role: SERVICE`
