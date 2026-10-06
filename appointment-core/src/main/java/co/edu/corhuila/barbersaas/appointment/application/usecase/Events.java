@@ -19,6 +19,8 @@ final class Events {
     static final String CANCELLED = "AppointmentCancelled";
     static final String NO_SHOW = "AppointmentMarkedNoShow";
     static final String COMPLETED = "AppointmentCompleted";
+    /** Written by the reminder job the day before (DEC-APPT-07); notifications sends the REMINDER. */
+    static final String REMINDER_DUE = "AppointmentReminderDue";
 
     private Events() {
     }
