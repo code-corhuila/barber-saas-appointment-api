@@ -4,6 +4,7 @@ import co.edu.corhuila.barbersaas.appointment.adapter.in.http.AuthFilter;
 import co.edu.corhuila.barbersaas.appointment.adapter.in.http.CorrelationFilter;
 import co.edu.corhuila.barbersaas.appointment.adapter.in.http.Rs256Verifier;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopApiClient;
+import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopZonesClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.ScheduleApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.InMemoryAppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.JdbcAppointmentRepository;
@@ -11,14 +12,17 @@ import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.SystemCloc
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.UuidGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.BusySlotUseCases;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.OutboxRelayUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarberAvailability;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.ManageAppointments;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.QueryBusySlots;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.RelayOutbox;
+import co.edu.corhuila.barbersaas.appointment.application.usecase.RunDailyJobs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -89,6 +93,14 @@ public class AppointmentConfiguration {
     @Bean
     OutboxRelayUseCases outboxRelayUseCases(AppointmentRepository appointments) {
         return new RelayOutbox((OutboxStore) appointments, new SystemClock());
+    }
+
+    /** The barbershop's zone comes from its public detail: the worker's token is not one barbershop-api takes. */
+    @Bean
+    DailyJobUseCases dailyJobUseCases(AppointmentRepository appointments,
+                                      @Value("${appointment.barbershop-api-url}") String barbershopUrl) {
+        return new RunDailyJobs((DailyJobsStore) appointments, appointments, new BarbershopZonesClient(barbershopUrl),
+                new SystemClock(), new UuidGenerator());
     }
 
     /** JWT_PUBLIC_KEY: the PEM itself; a one-line value with literal \n escapes, as an env file holds it, is accepted. */
