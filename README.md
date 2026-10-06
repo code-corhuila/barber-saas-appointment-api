@@ -73,12 +73,12 @@ Completing no longer writes the income to finance: finance and loyalty consume `
 
 ### How to start it
 
-As part of the platform: `./scripts/up.sh dev` in `barber-saas-infra` (it needs `barbershop-api`
+As part of the platform: `./scripts/up.sh dev` in `barber-saas-infra-postgres` (it needs `barbershop-api`
 and `schedule-api`). Alone, without a database (in-memory repository), pointing at running APIs:
 
 ```bash
 mvn -B -DskipTests package
-JWT_PUBLIC_KEY="$(cat ../barber-saas-infra/keys/jwt-public.pem)" \
+JWT_PUBLIC_KEY="$(cat ../barber-saas-infra-postgres/keys/jwt-public.pem)" \
 BARBERSHOP_API_URL=http://localhost:8081 SCHEDULE_API_URL=http://localhost:8082 \
   java -jar appointment-app/target/appointment-app-0.1.0.jar
 ```
