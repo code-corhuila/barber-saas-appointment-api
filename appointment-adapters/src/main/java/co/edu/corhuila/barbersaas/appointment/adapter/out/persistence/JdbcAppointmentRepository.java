@@ -2,6 +2,7 @@ package co.edu.corhuila.barbersaas.appointment.adapter.out.persistence;
 
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
@@ -33,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * read filters by the barbershop. ex_appointment_no_double_booking is the final guarantee against
  * double booking: its violation becomes SlotTaken, which the use case answers with 422.
  */
-public class JdbcAppointmentRepository implements AppointmentRepository, OutboxStore {
+public class JdbcAppointmentRepository implements AppointmentRepository, OutboxStore, DailyJobsStore {
 
     private static final String COLUMNS = "id, barbershop_id, client_id, barber_id, service_id, appointment_date, "
             + "start_time, end_time, status, price_at_booking_cents, notes, cancelled_reason, created_by, "
@@ -166,6 +167,35 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
                     e.id(), OutboxEvent.AGGREGATE_TYPE, e.aggregateId(), e.type(), toJson(e), correlationId,
                     Timestamp.from(e.occurredAt()));
         }
+    }
+
+    @Override
+    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, boolean withoutReminder) {
+        StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + " FROM appointment.appointment "
+                + "WHERE status = 'CONFIRMED' AND appointment_date <= ?");
+        List<Object> args = new ArrayList<>(List.of(to));
+        if (from != null) {
+            sql.append(" AND appointment_date >= ?");
+            args.add(from);
+        }
+        if (withoutReminder) {
+            sql.append(" AND reminder_sent_at IS NULL");
+        }
+        sql.append(" ORDER BY appointment_date, start_time, id");
+        return jdbc.query(sql.toString(), (rs, n) -> map(rs), args.toArray());
+    }
+
+    @Override
+    public boolean markReminderSent(UUID appointmentId, OutboxEvent event, Instant now) {
+        Boolean marked = tx.execute(status -> {
+            int changed = jdbc.update("UPDATE appointment.appointment SET reminder_sent_at = ? "
+                    + "WHERE id = ? AND status = 'CONFIRMED' AND reminder_sent_at IS NULL", Timestamp.from(now), appointmentId);
+            if (changed == 1) {
+                insert(List.of(event));
+            }
+            return changed == 1;
+        });
+        return Boolean.TRUE.equals(marked);
     }
 
     /** idx_outbox_event_unpublished serves this read: pending only, oldest first. */
