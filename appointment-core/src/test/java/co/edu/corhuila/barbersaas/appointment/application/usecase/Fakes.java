@@ -10,6 +10,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.IdGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,6 +51,18 @@ final class Fakes {
                     .filter(a -> q.status() == null || q.status() == a.status())
                     .filter(a -> q.barberId() == null || q.barberId().equals(a.barberId()))
                     .filter(a -> q.date() == null || q.date().equals(a.slot().date()))
+                    .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).reversed())
+                    .toList();
+            return Page.of(all, page);
+        }
+
+        @Override
+        public Page<Appointment> pageOfClient(UUID clientId, AppointmentStatus status, LocalDate date,
+                                              Page.Request page) {
+            List<Appointment> all = rows.values().stream()
+                    .filter(a -> clientId.equals(a.clientId()))
+                    .filter(a -> status == null || status == a.status())
+                    .filter(a -> date == null || date.equals(a.slot().date()))
                     .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).reversed())
                     .toList();
             return Page.of(all, page);

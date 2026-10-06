@@ -30,7 +30,10 @@ public interface AppointmentUseCases {
      */
     Created<Appointment> book(Caller caller, BookCommand command, String idempotencyKey);
 
-    /** Most recent first. */
+    /**
+     * Most recent first. A CLIENT whose token carries no barbershop gets their own appointments of
+     * every barbershop, and the barber filter does not apply (DEC-APPT-06).
+     */
     Page<Appointment> list(Caller caller, Filter filter, Page.Request page);
 
     /** A CLIENT only gets their own appointments: any other id is not found. */
