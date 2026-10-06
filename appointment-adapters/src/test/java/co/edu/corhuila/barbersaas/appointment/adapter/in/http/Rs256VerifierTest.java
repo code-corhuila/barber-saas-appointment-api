@@ -40,7 +40,7 @@ class Rs256VerifierTest {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(s.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** The same shape identity-auth-api and barber-saas-infra/scripts/dev-token.sh sign. */
+    /** The same shape identity-auth-api and barber-saas-infra-postgres/scripts/dev-token.sh sign. */
     static String token(KeyPair keys, String alg, String claims) {
         try {
             String input = b64("{\"alg\":\"" + alg + "\",\"typ\":\"JWT\",\"kid\":\"dev-1\"}") + "." + b64(claims);
