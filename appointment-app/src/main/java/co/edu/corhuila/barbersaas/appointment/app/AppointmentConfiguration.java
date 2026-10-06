@@ -11,11 +11,14 @@ import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.SystemCloc
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.UuidGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.BusySlotUseCases;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.OutboxRelayUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarberAvailability;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.ManageAppointments;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.QueryBusySlots;
+import co.edu.corhuila.barbersaas.appointment.application.usecase.RelayOutbox;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -80,6 +83,12 @@ public class AppointmentConfiguration {
     @Bean
     BusySlotUseCases busySlotUseCases(AppointmentRepository appointments) {
         return new QueryBusySlots(appointments);
+    }
+
+    /** The same store that writes the events reads them for the worker (both repositories implement it). */
+    @Bean
+    OutboxRelayUseCases outboxRelayUseCases(AppointmentRepository appointments) {
+        return new RelayOutbox((OutboxStore) appointments, new SystemClock());
     }
 
     /** JWT_PUBLIC_KEY: the PEM itself; a one-line value with literal \n escapes, as an env file holds it, is accepted. */
