@@ -78,6 +78,22 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
     }
 
     @Override
+    public Page<Appointment> pageOfClient(UUID clientId, AppointmentStatus status, LocalDate date, Page.Request page) {
+        StringBuilder from = new StringBuilder("FROM appointment.appointment WHERE client_id = ?");
+        List<Object> args = new ArrayList<>(List.of(clientId));
+        if (status != null) {
+            from.append(" AND status = ?");
+            args.add(status.name());
+        }
+        if (date != null) {
+            from.append(" AND appointment_date = ?");
+            args.add(date);
+        }
+        return JdbcPages.page(jdbc, COLUMNS, new JdbcPages.Query(from.toString(), args,
+                "ORDER BY appointment_date DESC, start_time DESC, id"), (rs, n) -> map(rs), page);
+    }
+
+    @Override
     public List<Slot> busy(UUID tenant, UUID barberId, LocalDate date) {
         return jdbc.query("SELECT appointment_date, start_time, end_time FROM appointment.appointment "
                         + "WHERE barbershop_id = ? AND barber_id = ? AND appointment_date = ? "

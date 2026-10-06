@@ -113,6 +113,32 @@ abstract class RepositoryContract {
                 new Page.Request(1, 10)).total());
     }
 
+    /** DEC-APPT-06: the client's own appointments of every barbershop, and nobody else's. */
+    @Test
+    void aClientsPageCrossesBarbershopsButNeverClients() {
+        UUID otherShop = UUID.randomUUID();
+        Appointment here = at(LocalTime.of(14, 0));
+        repository().saveNew(here, key(), List.of());
+        Appointment there = Appointment.book(UUID.randomUUID(), otherShop, client, UUID.randomUUID(),
+                UUID.randomUUID(), Slot.of(day, LocalTime.of(9, 0), 30), Money.ofCents(1), null, client,
+                LocalDateTime.now(), now);
+        repository().saveNew(there, key(), List.of());
+        Appointment notMine = Appointment.book(UUID.randomUUID(), otherShop, UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), Slot.of(day, LocalTime.of(10, 0), 30), Money.ofCents(1), null, client,
+                LocalDateTime.now(), now);
+        repository().saveNew(notMine, key(), List.of());
+
+        Page<Appointment> mine = repository().pageOfClient(client, null, null, new Page.Request(1, 10));
+
+        assertEquals(List.of(here.id(), there.id()), mine.items().stream().map(Appointment::id).toList());
+        assertEquals(List.of(shop, otherShop), mine.items().stream().map(Appointment::barbershopId).toList());
+        assertEquals(1, repository().pageOfClient(client, AppointmentStatus.PENDING, day, new Page.Request(1, 1))
+                .items().size());
+        assertEquals(0, repository().pageOfClient(client, AppointmentStatus.COMPLETED, null,
+                new Page.Request(1, 10)).total());
+        assertEquals(0, repository().pageOfClient(client, null, day.plusDays(1), new Page.Request(1, 10)).total());
+    }
+
     @Test
     void theBusySlotsAreTheActiveTimesOfThatBarberAndDateInThatBarbershopInStartOrder() {
         Appointment late = at(LocalTime.of(15, 30));
