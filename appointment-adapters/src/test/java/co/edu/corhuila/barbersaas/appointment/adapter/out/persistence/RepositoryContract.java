@@ -12,6 +12,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRe
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.SlotTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Money;
@@ -153,5 +154,29 @@ abstract class RepositoryContract {
         assertEquals(List.of(early.slot(), late.slot()), repository().busy(shop, barber, day));
         assertTrue(repository().busy(UUID.randomUUID(), barber, day).isEmpty(), "another barbershop");
         assertTrue(repository().busy(shop, barber, day.plusDays(1)).isEmpty(), "another date");
+    }
+
+    /** DEC-APPT-07: what the worker reads, in the order the events happened, and its confirmations. */
+    @Test
+    void theOutboxGivesPendingEventsOldestFirstAndForgetsConfirmedAndFailedOnes() {
+        OutboxStore outbox = (OutboxStore) repository();
+        Appointment a = at(LocalTime.of(19, 0));
+        OutboxEvent first = new OutboxEvent(UUID.randomUUID(), a.id(), "AppointmentCreated",
+                Map.of("barbershopId", shop.toString()), Instant.parse("2000-01-01T00:00:00Z"));
+        OutboxEvent second = new OutboxEvent(UUID.randomUUID(), a.id(), "AppointmentConfirmed",
+                Map.of("barbershopId", shop.toString()), Instant.parse("2000-01-01T00:00:01Z"));
+        repository().saveNew(a, key(), List.of(second, first));
+
+        List<OutboxStore.Stored> oldest = outbox.pending(2);
+
+        assertEquals(List.of(first.id(), second.id()), oldest.stream().map(st -> st.event().id()).toList());
+        assertEquals(shop.toString(), oldest.get(0).event().payload().get("barbershopId"));
+        assertEquals(1, outbox.pending(1).size());
+        assertTrue(outbox.markPublished(first.id(), now));
+        assertTrue(outbox.markPublished(first.id(), now), "confirming again is accepted");
+        assertTrue(outbox.markFailed(second.id(), "loyalty-api 422", now));
+        assertTrue(outbox.pending(100).stream().noneMatch(st -> st.event().aggregateId().equals(a.id())));
+        assertFalse(outbox.markPublished(UUID.randomUUID(), now));
+        assertFalse(outbox.markFailed(UUID.randomUUID(), "x", now));
     }
 }
