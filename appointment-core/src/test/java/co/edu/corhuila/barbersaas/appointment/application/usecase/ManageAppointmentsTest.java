@@ -251,6 +251,82 @@ class ManageAppointmentsTest {
         assertThrows(NotFound.class, () -> appointments.cancel(otherClient, a.id(), null));
     }
 
+    // --- DEC-APPT-06: a client without a barbershop in the token ---------------------------------
+
+    /** The same client as {@link #client}, with the login token: no barbershop yet. */
+    Caller clientWithoutShop() {
+        return new Caller(clientId.toString(), Role.CLIENT, null, "token");
+    }
+
+    Appointment bookedByClientIn(UUID shop, LocalTime start) {
+        Caller inShop = new Caller(clientId.toString(), Role.CLIENT, shop, "token");
+        return appointments.book(inShop, at(start), "key-" + UUID.randomUUID()).value();
+    }
+
+    @Test
+    void aClientWithoutABarbershopListsTheirOwnOfEveryBarbershop() {
+        Appointment here = bookedByClientIn(SHOP, LocalTime.of(10, 0));
+        Appointment there = bookedByClientIn(OTHER_SHOP, LocalTime.of(9, 0));
+
+        Page<Appointment> page = appointments.list(clientWithoutShop(), Filter.none(), new Page.Request(1, 20));
+
+        assertEquals(List.of(here.id(), there.id()), page.items().stream().map(Appointment::id).toList());
+        assertEquals(List.of(SHOP, OTHER_SHOP), page.items().stream().map(Appointment::barbershopId).toList());
+    }
+
+    @Test
+    void clientANeverSeesClientBsAppointmentsWithoutABarbershop() {
+        Appointment mine = bookedByClientIn(SHOP, LocalTime.of(10, 0));
+        appointments.book(otherClient, at(LocalTime.of(9, 0)), "key-00000009");
+        Caller otherClientWithoutShop = new Caller(otherClient.subject(), Role.CLIENT, null, "token");
+
+        Page<Appointment> page = appointments.list(clientWithoutShop(), Filter.none(), new Page.Request(1, 20));
+
+        assertEquals(List.of(mine.id()), page.items().stream().map(Appointment::id).toList());
+        assertFalse(appointments.list(otherClientWithoutShop, Filter.none(), new Page.Request(1, 20)).items()
+                .stream().anyMatch(a -> a.id().equals(mine.id())));
+    }
+
+    @Test
+    void theBarberFilterDoesNotApplyWithoutABarbershopButStatusAndDateDo() {
+        Appointment mine = bookedByClientIn(SHOP, LocalTime.of(10, 0));
+
+        Page<Appointment> anyBarber = appointments.list(clientWithoutShop(),
+                new Filter(null, UUID.randomUUID(), null), new Page.Request(1, 20));
+        Page<Appointment> otherDay = appointments.list(clientWithoutShop(),
+                new Filter(null, null, DAY.plusDays(1)), new Page.Request(1, 20));
+        Page<Appointment> confirmed = appointments.list(clientWithoutShop(),
+                new Filter(AppointmentStatus.CONFIRMED, null, null), new Page.Request(1, 20));
+
+        assertEquals(List.of(mine.id()), anyBarber.items().stream().map(Appointment::id).toList());
+        assertEquals(0, otherDay.total());
+        assertEquals(0, confirmed.total());
+    }
+
+    @Test
+    void staffAndAClientWithABarbershopStayInsideTheirBarbershop() {
+        Appointment here = bookedByClientIn(SHOP, LocalTime.of(10, 0));
+        Appointment there = bookedByClientIn(OTHER_SHOP, LocalTime.of(9, 0));
+
+        assertEquals(List.of(here.id()), appointments.list(admin, Filter.none(), new Page.Request(1, 20))
+                .items().stream().map(Appointment::id).toList());
+        assertEquals(List.of(there.id()), appointments.list(otherAdmin, Filter.none(), new Page.Request(1, 20))
+                .items().stream().map(Appointment::id).toList());
+        assertEquals(List.of(here.id()), appointments.list(client, Filter.none(), new Page.Request(1, 20))
+                .items().stream().map(Appointment::id).toList());
+        assertThrows(Forbidden.class, () -> appointments.list(superAdmin, Filter.none(), new Page.Request(1, 20)));
+    }
+
+    @Test
+    void everyOtherOperationStillRequiresTheBarbershop() {
+        Appointment mine = bookedByClientIn(SHOP, LocalTime.of(10, 0));
+
+        assertThrows(Forbidden.class, () -> appointments.get(clientWithoutShop(), mine.id()));
+        assertThrows(Forbidden.class, () -> appointments.cancel(clientWithoutShop(), mine.id(), null));
+        assertThrows(Forbidden.class,
+                () -> appointments.book(clientWithoutShop(), at(LocalTime.of(9, 30)), "key-00000010"));
+    }
+
     // --- transitions ---------------------------------------------------------------------------
 
     @Test

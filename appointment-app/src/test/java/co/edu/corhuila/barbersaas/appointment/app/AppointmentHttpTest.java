@@ -68,7 +68,7 @@ class AppointmentHttpTest extends HttpTest {
                 .andExpect(jsonPath("$.startTime").value("09:30"))
                 .andExpect(jsonPath("$.endTime").value("10:00"))
                 .andExpect(jsonPath("$.priceAtBookingCents").value(2_500_000))
-                .andExpect(jsonPath("$.barbershopId").doesNotExist());
+                .andExpect(jsonPath("$.barbershopId").value(shop.toString()));
     }
 
     @Test
@@ -155,6 +155,53 @@ class AppointmentHttpTest extends HttpTest {
                         .header("Authorization", staff))
                 .andExpect(jsonPath("$.meta.total").value(2))
                 .andExpect(jsonPath("$.data[0].startTime").value("10:00"));
+    }
+
+    /** DEC-APPT-06: barbershopId is output only, so a booking that carries it is refused like any unknown field. */
+    @Test
+    void aBookingThatCarriesABarbershopIdIsRejectedNotApplied() throws Exception {
+        UUID otherShop = UUID.randomUUID();
+
+        book(client, "key-00000012", booking("09:00").replace("}", ",\"barbershopId\":\"" + otherShop + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details[0].field").value("barbershopId"));
+        http.perform(get("/api/v1/appointments").header("Authorization", client))
+                .andExpect(jsonPath("$.meta.total").value(0));
+    }
+
+    /** DEC-APPT-06: the login token of a client, with no barbershop, lists their own of every barbershop. */
+    @Test
+    void aClientWithoutABarbershopListsTheirOwnOfEveryBarbershop() throws Exception {
+        UUID otherShop = UUID.randomUUID();
+        UUID otherBarber = UUID.randomUUID();
+        UUID otherService = UUID.randomUUID();
+        OTHER_APIS.services.put(otherService, new OtherApisStub.Service(otherShop, 30, 3_000_000));
+        OTHER_APIS.barbers.put(otherBarber, otherShop);
+        String here = bookedId("10:00");
+        String elsewhere = "{\"barberId\":\"" + otherBarber + "\",\"serviceId\":\"" + otherService + "\",\"date\":\""
+                + day + "\",\"startTime\":\"09:00\"}";
+        book(bearer(clientId, "CLIENT", otherShop), "key-" + UUID.randomUUID(), elsewhere)
+                .andExpect(status().isCreated());
+        book(bearer("CLIENT", shop), "key-" + UUID.randomUUID(), booking("09:30")).andExpect(status().isCreated());
+        String withoutShop = bearer(clientId, "CLIENT", null);
+
+        http.perform(get("/api/v1/appointments").header("Authorization", withoutShop))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(here))
+                .andExpect(jsonPath("$.data[0].barbershopId").value(shop.toString()))
+                .andExpect(jsonPath("$.data[1].barbershopId").value(otherShop.toString()));
+        http.perform(get("/api/v1/appointments").param("barbershopId", otherShop.toString())
+                        .param("barberId", barber.toString()).header("Authorization", withoutShop))
+                .andExpect(jsonPath("$.meta.total").value(2));
+        http.perform(get("/api/v1/appointments").header("Authorization", staff))
+                .andExpect(jsonPath("$.meta.total").value(2));
+        http.perform(get("/api/v1/appointments").header("Authorization", client))
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(here));
+        http.perform(get("/api/v1/appointments/" + here).header("Authorization", withoutShop))
+                .andExpect(status().isForbidden());
     }
 
     @Test
