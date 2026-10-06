@@ -1,4 +1,4 @@
-# This service only. barber-saas-infra includes this file to compose the platform.
+# This service only. barber-saas-infra-postgres includes this file to compose the platform.
 services:
   appointment-api:
     build:
@@ -6,12 +6,12 @@ services:
       dockerfile: deploy/Dockerfile
     environment:
       PORT: "8080"
-      # The single PostgreSQL instance of barber-saas-infra, with this domain's own user (Annex J J.7).
+      # The single PostgreSQL instance of barber-saas-infra-postgres, with this domain's own user (Annex J J.7).
       DATABASE_URL: jdbc:postgresql://postgres:5432/${PG_DATABASE:?set PG_DATABASE}
       DATABASE_USER: appointment_app
       DATABASE_PASSWORD: ${APPOINTMENT_APP_PASSWORD:?set APPOINTMENT_APP_PASSWORD}
       # Only the public half: this service validates tokens, it never signs them.
-      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?run barber-saas-infra/scripts/dev-keys.sh}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?run barber-saas-infra-postgres/scripts/dev-keys.sh}
       DB_POOL_MAX: "10"
       # The other domains, through their APIs on the platform network (golden rule 8).
       BARBERSHOP_API_URL: http://barbershop-api:8080
