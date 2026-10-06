@@ -44,11 +44,22 @@ final class JsonApi {
 
     /** 200: the body. 404: empty (absent, or another barbershop's). Anything else: DependencyFailure. */
     Optional<JsonNode> get(Caller caller, String pathAndQuery) {
+        return get(pathAndQuery, "Bearer " + caller.credential());
+    }
+
+    /** An anonymous read of the other domain (DEC-SHOP-02): no token is sent. */
+    Optional<JsonNode> getPublic(String pathAndQuery) {
+        return get(pathAndQuery, null);
+    }
+
+    private Optional<JsonNode> get(String pathAndQuery, String authorization) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl + pathAndQuery))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", "application/json")
-                .header("Authorization", "Bearer " + caller.credential())
                 .GET();
+        if (authorization != null) {
+            request.header("Authorization", authorization);
+        }
         String correlationId = MDC.get("correlationId");
         if (correlationId != null) {
             request.header("X-Correlation-Id", correlationId);
