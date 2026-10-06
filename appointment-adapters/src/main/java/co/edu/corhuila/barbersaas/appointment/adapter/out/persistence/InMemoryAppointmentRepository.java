@@ -2,6 +2,7 @@ package co.edu.corhuila.barbersaas.appointment.adapter.out.persistence;
 
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
@@ -23,13 +24,14 @@ import org.slf4j.MDC;
  * Used when DATABASE_URL is empty: the service starts and its HTTP contract can be tested without a
  * database. Writes are synchronized so the no-double-booking rule holds as it does in PostgreSQL.
  */
-public class InMemoryAppointmentRepository implements AppointmentRepository, OutboxStore {
+public class InMemoryAppointmentRepository implements AppointmentRepository, OutboxStore, DailyJobsStore {
 
     private final Map<UUID, Appointment> rows = new ConcurrentHashMap<>();
     private final Map<String, Idempotency.Stored> keys = new ConcurrentHashMap<>();
     private final List<OutboxEvent> outbox = new CopyOnWriteArrayList<>();
     /** Per event: its correlation id, and whether it was published or set aside as failed. */
     private final Map<UUID, Relay> relay = new ConcurrentHashMap<>();
+    private final Map<UUID, Instant> reminders = new ConcurrentHashMap<>();
 
     private record Relay(String correlationId, Instant publishedAt, Instant failedAt, String lastError) { }
 
@@ -104,6 +106,25 @@ public class InMemoryAppointmentRepository implements AppointmentRepository, Out
         String correlationId = Optional.ofNullable(MDC.get("correlationId")).orElse("none");
         events.forEach(e -> relay.put(e.id(), new Relay(correlationId, null, null, null)));
         outbox.addAll(events);
+    }
+
+    @Override
+    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, boolean withoutReminder) {
+        return rows.values().stream().filter(a -> a.status() == AppointmentStatus.CONFIRMED)
+                .filter(a -> !a.slot().date().isAfter(to) && (from == null || !a.slot().date().isBefore(from)))
+                .filter(a -> !withoutReminder || !reminders.containsKey(a.id()))
+                .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).thenComparing(Appointment::id))
+                .toList();
+    }
+
+    @Override
+    public synchronized boolean markReminderSent(UUID appointmentId, OutboxEvent event, Instant now) {
+        Appointment a = rows.get(appointmentId);
+        if (a == null || a.status() != AppointmentStatus.CONFIRMED || reminders.putIfAbsent(appointmentId, now) != null) {
+            return false;
+        }
+        append(List.of(event));
+        return true;
     }
 
     @Override
