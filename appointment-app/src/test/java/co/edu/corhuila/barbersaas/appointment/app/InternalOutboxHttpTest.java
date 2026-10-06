@@ -27,9 +27,10 @@ class InternalOutboxHttpTest extends HttpTest {
     private final String worker = serviceBearer("barber-saas-worker");
 
     @BeforeEach
-    void catalog() {
+    void catalog() throws Exception {
         OTHER_APIS.services.put(service, new OtherApisStub.Service(shop, 30, 2_500_000));
         OTHER_APIS.barbers.put(barber, shop);
+        drainOutbox(json, worker);
     }
 
     /** Books an appointment and returns the id of its AppointmentCreated event, as the worker sees it. */
