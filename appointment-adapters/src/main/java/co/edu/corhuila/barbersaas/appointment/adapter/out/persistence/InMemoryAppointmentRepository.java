@@ -5,6 +5,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRe
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -38,6 +39,17 @@ public class InMemoryAppointmentRepository implements AppointmentRepository {
                 .filter(a -> q.status() == null || q.status() == a.status())
                 .filter(a -> q.barberId() == null || q.barberId().equals(a.barberId()))
                 .filter(a -> q.date() == null || q.date().equals(a.slot().date()))
+                .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).reversed()
+                        .thenComparing(Appointment::id))
+                .toList(), page);
+    }
+
+    @Override
+    public Page<Appointment> pageOfClient(UUID clientId, AppointmentStatus status, LocalDate date, Page.Request page) {
+        return Page.of(rows.values().stream()
+                .filter(a -> clientId.equals(a.clientId()))
+                .filter(a -> status == null || status == a.status())
+                .filter(a -> date == null || date.equals(a.slot().date()))
                 .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).reversed()
                         .thenComparing(Appointment::id))
                 .toList(), page);

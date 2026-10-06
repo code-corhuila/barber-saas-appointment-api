@@ -116,6 +116,10 @@ public class ManageAppointments implements AppointmentUseCases {
     @Override
     public Page<Appointment> list(Caller caller, Filter f, Page.Request page) {
         caller.require(Role.CLIENT, Role.ADMIN_BARBERSHOP, Role.BARBER);
+        if (caller.is(Role.CLIENT) && caller.barbershopId() == null) {
+            // DEC-APPT-06: only the client's own, of every barbershop; the id is the token's sub, never a parameter.
+            return appointments.pageOfClient(caller.userId(), f.status(), f.date(), page);
+        }
         UUID onlyClient = caller.is(Role.CLIENT) ? caller.userId() : null;
         return appointments.page(caller.tenant(), new Query(onlyClient, f.status(), f.barberId(), f.date()), page);
     }
