@@ -10,6 +10,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRe
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.KeyTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.Query;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.SlotTaken;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
@@ -178,5 +179,33 @@ abstract class RepositoryContract {
         assertTrue(outbox.pending(100).stream().noneMatch(st -> st.event().aggregateId().equals(a.id())));
         assertFalse(outbox.markPublished(UUID.randomUUID(), now));
         assertFalse(outbox.markFailed(UUID.randomUUID(), "x", now));
+    }
+
+    /** DEC-APPT-07: the jobs read CONFIRMED appointments of every barbershop and mark a reminder once. */
+    @Test
+    void theJobsSeeConfirmedAppointmentsAcrossBarbershopsAndMarkAReminderOnce() {
+        DailyJobsStore jobs = (DailyJobsStore) repository();
+        Appointment confirmed = at(LocalTime.of(20, 0));
+        repository().saveNew(confirmed, key(), List.of());
+        confirmed.confirm(now);
+        repository().update(confirmed, List.of());
+        Appointment pending = at(LocalTime.of(21, 0));
+        repository().saveNew(pending, key(), List.of());
+        OutboxEvent reminder = new OutboxEvent(UUID.randomUUID(), confirmed.id(), "AppointmentReminderDue",
+                Map.of("barbershopId", shop.toString()), now);
+
+        List<UUID> seen = jobs.confirmedBetween(day, day, true).stream().map(Appointment::id).toList();
+
+        assertTrue(seen.contains(confirmed.id()));
+        assertFalse(seen.contains(pending.id()), "only CONFIRMED");
+        assertTrue(jobs.confirmedBetween(null, day, false).stream().anyMatch(a -> a.id().equals(confirmed.id())));
+        assertFalse(jobs.confirmedBetween(day.plusDays(1), day.plusDays(1), false).stream()
+                .anyMatch(a -> a.id().equals(confirmed.id())));
+        assertTrue(jobs.markReminderSent(confirmed.id(), reminder, now));
+        assertFalse(jobs.markReminderSent(confirmed.id(), reminder, now), "a reminder is written once");
+        assertFalse(jobs.markReminderSent(pending.id(), reminder, now), "never for one that is not CONFIRMED");
+        assertFalse(jobs.confirmedBetween(day, day, true).stream().anyMatch(a -> a.id().equals(confirmed.id())));
+        assertTrue(jobs.confirmedBetween(day, day, false).stream().anyMatch(a -> a.id().equals(confirmed.id())));
+        assertTrue(((OutboxStore) repository()).markPublished(reminder.id(), now), "the event was written with it");
     }
 }
