@@ -143,4 +143,15 @@ class ApiClientsTest {
 
         assertThrows(DependencyFailure.class, () -> new BarbershopApiClient(base).policy(caller));
     }
+
+    /** DEC-APPT-07: the jobs read the zone from the public detail, with no token, and Bogotá when it is gone. */
+    @Test
+    void theZoneOfABarbershopComesFromItsPublicDetailWithoutAToken() {
+        UUID shop = UUID.randomUUID();
+        answer("/api/v1/barbershops/" + shop, "{\"id\":\"" + shop + "\",\"timezone\":\"Pacific/Auckland\"}");
+
+        assertEquals(ZoneId.of("Pacific/Auckland"), new BarbershopZonesClient(base).zoneOf(shop));
+        assertEquals("null", seenHeaders.get("Authorization"));
+        assertEquals(ZoneId.of("America/Bogota"), new BarbershopZonesClient(base).zoneOf(UUID.randomUUID()));
+    }
 }
