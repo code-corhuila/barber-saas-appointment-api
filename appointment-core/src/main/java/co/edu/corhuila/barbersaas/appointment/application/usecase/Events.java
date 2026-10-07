@@ -42,4 +42,17 @@ final class Events {
         }
         return new OutboxEvent(ids.next(), a.id(), type, payload, now);
     }
+
+    /** AppointmentCompleted adds who completed it (DEC-APPT-08): loyalty grants the sticker in their name. */
+    static OutboxEvent completed(Appointment a, String completedBy, IdGenerator ids, Instant now) {
+        OutboxEvent base = of(COMPLETED, a, ids, now);
+        Map<String, Object> payload = new LinkedHashMap<>(base.payload());
+        payload.put("completedBy", completedBy);
+        return new OutboxEvent(base.id(), base.aggregateId(), COMPLETED, payload, now);
+    }
+
+    /** The envelope version of each event: AppointmentCompleted gained completedBy (DEC-APPT-08). */
+    static int version(String type) {
+        return COMPLETED.equals(type) ? 2 : 1;
+    }
 }

@@ -345,6 +345,9 @@ class ManageAppointmentsTest {
         assertEquals(a.id(), completed.aggregateId());
         assertEquals(2_500_000L, completed.payload().get("priceAtBookingCents"));
         assertEquals(clientId.toString(), completed.payload().get("clientId"));
+        assertEquals(admin.subject(), completed.payload().get("completedBy"), "DEC-APPT-08: who completed it");
+        assertEquals(2, Events.version(completed.type()));
+        assertEquals(1, Events.version(repository.outbox.get(0).type()));
     }
 
     @Test
