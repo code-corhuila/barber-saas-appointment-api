@@ -42,6 +42,8 @@ that is `barber-saas-appointment-db`.
 | `POST …/{id}/confirm`, `/start`, `/complete`, `/no-show` | `ADMIN_BARBERSHOP`, `BARBER` |
 | `POST …/{id}/cancel` | `CLIENT` their own, outside the barbershop's window; staff always |
 | `GET /internal/v1/busy-slots?barbershopId&barberId&date` (internal network only) | the service token of `barber-saas-schedule-api` only |
+| `GET /internal/v1/outbox-events?limit`, `POST …/{id}/published`, `POST …/{id}/failed` | the service token of `barber-saas-worker` only |
+| `POST /internal/v1/appointments/reminders-due?limit`, `POST …/no-shows?limit` | the service token of `barber-saas-worker` only |
 | `GET /health` | liveness, no token |
 
 Rules: the end and the price come from the service and the price never changes afterwards
@@ -72,7 +74,17 @@ unreachable or answers 502/503/504; a failure answers `500` instead of a guessed
 **Events:** booking, confirming, completing, cancelling and a no-show write `AppointmentCreated`,
 `AppointmentConfirmed`, `AppointmentCompleted`, `AppointmentCancelled` and
 `AppointmentMarkedNoShow` to `appointment.outbox_event` in the same transaction as the change.
-Completing no longer writes the income to finance: finance and loyalty consume `AppointmentCompleted`.
+Completing no longer writes the income to finance: loyalty consumes `AppointmentCompleted` (the
+sticker), and income is recorded by the staff in finance-inventory, which consumes no events.
+
+**The worker (`DEC-APPT-07`, ADR-016):** `barber-saas-worker` reads the pending events (neither
+published nor failed, oldest first) as `EventEnvelope`s — the tenant from each payload, the
+correlation id from the row — delivers them and confirms each one (`published`), or sets it aside
+with its reason (`failed`). It also calls the two daily jobs, whose rules live here: the reminders of
+tomorrow's `CONFIRMED` appointments (once each, `reminder_sent_at`) and the no-shows of `CONFIRMED`
+appointments dated before today, both judged in each barbershop's local date. The zone comes from the
+barbershop's public detail, `America/Bogota` when it is no longer visible (barber-saas-docs#88). Each
+job answers `{processed, remaining}`.
 
 ### How to start it
 
@@ -106,6 +118,4 @@ and `TEST_DATABASE_PASSWORD` are set.
 
 - **Outbound token.** Calls to barbershop-api and schedule-api forward the caller's token (a
   client's is bound to the barbershop since `DEC-AUTH-06`): their operations take the tenant from it.
-- **Publishing the outbox.** Events are stored but not yet published: the transport is open (AT-004).
-- **Not in this contract yet:** reschedule, reward coupons applied at booking, and the reminder and
-  automatic no-show jobs of the prototype (the worker's).
+- **Not in this contract yet:** reschedule and reward coupons applied at booking.
