@@ -142,7 +142,12 @@ public class ManageAppointments implements AppointmentUseCases {
 
     @Override
     public Appointment complete(Caller caller, UUID id) {
-        return transition(caller, id, Events.COMPLETED, Appointment::complete);
+        caller.require(Role.ADMIN_BARBERSHOP, Role.BARBER);
+        Appointment appointment = visible(caller, id);
+        Instant now = clock.now();
+        appointment.complete(now);
+        appointments.update(appointment, List.of(Events.completed(appointment, caller.subject(), ids, now)));
+        return appointment;
     }
 
     @Override
