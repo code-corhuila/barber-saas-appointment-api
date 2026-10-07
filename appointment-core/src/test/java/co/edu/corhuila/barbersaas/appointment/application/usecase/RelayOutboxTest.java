@@ -79,7 +79,7 @@ class RelayOutboxTest {
         assertEquals(50, outbox.askedLimit);
         assertEquals(e.id(), envelope.id());
         assertEquals("AppointmentCompleted", envelope.type());
-        assertEquals(1, envelope.version());
+        assertEquals(2, envelope.version(), "AppointmentCompleted is at version 2 (DEC-APPT-08)");
         assertEquals("appointment", envelope.aggregateType());
         assertEquals(e.aggregateId(), envelope.aggregateId());
         assertEquals(shop, envelope.barbershopId());
