@@ -17,8 +17,6 @@ import java.util.UUID;
 public class RelayOutbox implements OutboxRelayUseCases {
 
     static final String WORKER = "barber-saas-worker";
-    /** Every appointment event is at version 1; it grows only when a payload gains a field. */
-    static final int VERSION = 1;
     static final int REASON_MAX = 500;
 
     private final OutboxStore outbox;
@@ -57,7 +55,7 @@ public class RelayOutbox implements OutboxRelayUseCases {
     private static EventEnvelope envelope(OutboxStore.Stored s) {
         OutboxEvent e = s.event();
         Object shop = e.payload().get("barbershopId");
-        return new EventEnvelope(e.id(), e.type(), VERSION, e.occurredAt(), OutboxEvent.AGGREGATE_TYPE, e.aggregateId(),
+        return new EventEnvelope(e.id(), e.type(), Events.version(e.type()), e.occurredAt(), OutboxEvent.AGGREGATE_TYPE, e.aggregateId(),
                 shop == null ? null : UUID.fromString(shop.toString()), s.correlationId(), e.payload());
     }
 }
