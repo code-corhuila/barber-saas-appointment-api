@@ -68,7 +68,32 @@ class AppointmentHttpTest extends HttpTest {
                 .andExpect(jsonPath("$.startTime").value("09:30"))
                 .andExpect(jsonPath("$.endTime").value("10:00"))
                 .andExpect(jsonPath("$.priceAtBookingCents").value(2_500_000))
-                .andExpect(jsonPath("$.barbershopId").value(shop.toString()));
+                .andExpect(jsonPath("$.barbershopId").value(shop.toString()))
+                .andExpect(jsonPath("$.couponId").doesNotExist());
+    }
+
+    @Test
+    void theClientsActiveRewardCouponPaysTheBooking() throws Exception {
+        UUID coupon = UUID.randomUUID();
+        OTHER_APIS.coupons.put(clientId, coupon);
+        OTHER_APIS.couponShops.put(coupon, shop);
+
+        book(client, "key-coupon-" + UUID.randomUUID(), booking("10:30"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priceAtBookingCents").value(0))
+                .andExpect(jsonPath("$.couponId").value(coupon.toString()));
+    }
+
+    @Test
+    void aCouponOfAnotherBarbershopIsNotApplied() throws Exception {
+        UUID coupon = UUID.randomUUID();
+        OTHER_APIS.coupons.put(clientId, coupon);
+        OTHER_APIS.couponShops.put(coupon, UUID.randomUUID());
+
+        book(client, "key-coupon-" + UUID.randomUUID(), booking("10:30"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priceAtBookingCents").value(2_500_000))
+                .andExpect(jsonPath("$.couponId").doesNotExist());
     }
 
     @Test

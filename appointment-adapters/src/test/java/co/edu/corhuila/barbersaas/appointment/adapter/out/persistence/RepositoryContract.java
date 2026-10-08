@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.CouponTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.KeyTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.Query;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.SlotTaken;
@@ -50,6 +51,32 @@ abstract class RepositoryContract {
 
     OutboxEvent event(Appointment a, String type) {
         return new OutboxEvent(UUID.randomUUID(), a.id(), type, Map.of("appointmentId", a.id().toString()), now);
+    }
+
+    Appointment paidWith(UUID coupon, LocalTime start) {
+        return Appointment.book(UUID.randomUUID(), shop, client, UUID.randomUUID(), UUID.randomUUID(),
+                Slot.of(day, start, 30), Money.ofCents(2_500_000), null, client, coupon, LocalDateTime.now(), now);
+    }
+
+    @Test
+    void theRewardCouponIsStoredAndReadBack() {
+        UUID coupon = UUID.randomUUID();
+        Appointment a = paidWith(coupon, LocalTime.of(11, 0));
+
+        repository().saveNew(a, key(), List.of());
+
+        Appointment stored = repository().findById(shop, a.id()).orElseThrow();
+        assertEquals(coupon, stored.couponId());
+        assertEquals(0, stored.price().cents());
+    }
+
+    @Test
+    void aCouponPaysOneAppointmentOnly() {
+        UUID coupon = UUID.randomUUID();
+        repository().saveNew(paidWith(coupon, LocalTime.of(11, 0)), key(), List.of());
+
+        assertThrows(CouponTaken.class,
+                () -> repository().saveNew(paidWith(coupon, LocalTime.of(12, 0)), key(), List.of()));
     }
 
     @Test

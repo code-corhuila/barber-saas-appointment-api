@@ -67,7 +67,8 @@ or notes). An unknown barber or one of another barbershop is an empty list. sche
 `barbershopId` from its caller's token, so availability is the same for every role.
 
 **Other domains, through their APIs (golden rule 8):** price, duration, time zone and cancellation
-window from `barbershop-api`; free slots from `schedule-api`. Each call carries the caller's token
+window from `barbershop-api`; free slots from `schedule-api`; the client's `ACTIVE` reward coupon from
+`loyalty-api` (`LOYALTY_API_URL`). Each call carries the caller's token
 and `X-Correlation-Id`, with 2 s to connect, 3 s per attempt and one retry only when the service is
 unreachable or answers 502/503/504; a failure answers `500` instead of a guessed booking.
 
@@ -76,6 +77,13 @@ unreachable or answers 502/503/504; a failure answers `500` instead of a guessed
 `AppointmentMarkedNoShow` to `appointment.outbox_event` in the same transaction as the change.
 Completing no longer writes the income to finance: loyalty consumes `AppointmentCompleted` (the
 sticker), and income is recorded by the staff in finance-inventory, which consumes no events.
+
+**Reward coupon at booking (`DEC-APPT-09`, FR-010):** when the appointment has a client (never a
+walk-in), booking asks loyalty-api for that client's `ACTIVE` coupon. If there is one, the appointment
+is stored at `priceAtBookingCents = 0` with its `couponId`, and `AppointmentCreated` (envelope `version`
+2) carries `couponId`, so loyalty marks the coupon `USED` when the worker delivers it. A coupon pays one
+appointment (`uq_appointment_coupon`): a racing booking answers `422`. If loyalty-api does not answer,
+the booking fails (`500`) instead of charging the full price. Cancelling does not give the coupon back.
 
 **The worker (`DEC-APPT-07`, ADR-016):** `barber-saas-worker` reads the pending events (neither
 published nor failed, oldest first) as `EventEnvelope`s — the tenant from each payload, the
@@ -118,4 +126,4 @@ and `TEST_DATABASE_PASSWORD` are set.
 
 - **Outbound token.** Calls to barbershop-api and schedule-api forward the caller's token (a
   client's is bound to the barbershop since `DEC-AUTH-06`): their operations take the tenant from it.
-- **Not in this contract yet:** reschedule and reward coupons applied at booking.
+- **Not in this contract yet:** reschedule.
