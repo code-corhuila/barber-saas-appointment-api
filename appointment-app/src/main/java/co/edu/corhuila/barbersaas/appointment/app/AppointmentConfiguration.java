@@ -5,6 +5,7 @@ import co.edu.corhuila.barbersaas.appointment.adapter.in.http.CorrelationFilter;
 import co.edu.corhuila.barbersaas.appointment.adapter.in.http.Rs256Verifier;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopZonesClient;
+import co.edu.corhuila.barbersaas.appointment.adapter.out.http.LoyaltyApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.ScheduleApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.InMemoryAppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.JdbcAppointmentRepository;
@@ -16,6 +17,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCas
 import co.edu.corhuila.barbersaas.appointment.application.port.in.OutboxRelayUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarberAvailability;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.RewardCoupons;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
@@ -79,9 +81,15 @@ public class AppointmentConfiguration {
     }
 
     @Bean
+    RewardCoupons rewardCoupons(@Value("${appointment.loyalty-api-url}") String url) {
+        return new LoyaltyApiClient(url);
+    }
+
+    @Bean
     AppointmentUseCases appointmentUseCases(AppointmentRepository appointments, BarbershopCatalog catalog,
-                                            BarberAvailability availability) {
-        return new ManageAppointments(appointments, catalog, availability, new SystemClock(), new UuidGenerator());
+                                            BarberAvailability availability, RewardCoupons coupons) {
+        return new ManageAppointments(appointments, catalog, availability, coupons, new SystemClock(),
+                new UuidGenerator());
     }
 
     @Bean

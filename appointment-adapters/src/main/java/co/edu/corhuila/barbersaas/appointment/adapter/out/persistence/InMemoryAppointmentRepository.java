@@ -88,6 +88,10 @@ public class InMemoryAppointmentRepository implements AppointmentRepository, Out
         if (overlaps(appointment.barberId(), appointment.slot())) {
             throw new SlotTaken();
         }
+        if (appointment.couponId() != null
+                && rows.values().stream().anyMatch(a -> appointment.couponId().equals(a.couponId()))) {
+            throw new CouponTaken();   // as uq_appointment_coupon
+        }
         if (keys.putIfAbsent(key.operation() + " " + key.key(),
                 new Idempotency.Stored(appointment.id(), key.requestHash())) != null) {
             throw new KeyTaken();
