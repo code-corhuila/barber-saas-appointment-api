@@ -38,8 +38,9 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
 
     private static final String COLUMNS = "id, barbershop_id, client_id, barber_id, service_id, appointment_date, "
             + "start_time, end_time, status, price_at_booking_cents, notes, cancelled_reason, created_by, "
-            + "created_at, updated_at";
+            + "created_at, updated_at, coupon_id";
     private static final String NO_DOUBLE_BOOKING = "ex_appointment_no_double_booking";
+    private static final String ONE_APPOINTMENT_PER_COUPON = "uq_appointment_coupon";
     private static final String KEY_PRIMARY_KEY = "pk_idempotency_key";
 
     private final JdbcTemplate jdbc;
@@ -127,11 +128,11 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
         try {
             tx.executeWithoutResult(status -> {
                 jdbc.update("INSERT INTO appointment.appointment (" + COLUMNS + ") "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         a.id(), a.barbershopId(), a.clientId(), a.barberId(), a.serviceId(), a.slot().date(),
                         a.slot().start(), a.slot().end(), a.status().name(), a.price().cents(), a.notes(),
                         a.cancelledReason(), a.createdBy(), Timestamp.from(a.createdAt()),
-                        Timestamp.from(a.updatedAt()));
+                        Timestamp.from(a.updatedAt()), a.couponId());
                 JdbcIdempotency.insert(jdbc, key, a.id());
                 insert(events);
             });
@@ -139,6 +140,9 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
             String message = String.valueOf(e.getMessage());
             if (message.contains(NO_DOUBLE_BOOKING)) {
                 throw new SlotTaken();
+            }
+            if (message.contains(ONE_APPOINTMENT_PER_COUPON)) {
+                throw new CouponTaken();
             }
             if (message.contains(KEY_PRIMARY_KEY)) {
                 throw new KeyTaken();
@@ -245,7 +249,7 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
                         rs.getObject("end_time", LocalTime.class)),
                 Money.ofCents(rs.getLong("price_at_booking_cents")), rs.getString("notes"),
                 rs.getObject("created_by", UUID.class), rs.getTimestamp("created_at").toInstant(),
-                AppointmentStatus.valueOf(rs.getString("status")), rs.getString("cancelled_reason"),
+                rs.getObject("coupon_id", UUID.class), AppointmentStatus.valueOf(rs.getString("status")), rs.getString("cancelled_reason"),
                 rs.getTimestamp("updated_at").toInstant());
     }
 }

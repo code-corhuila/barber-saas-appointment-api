@@ -59,7 +59,7 @@ class InternalOutboxHttpTest extends HttpTest {
         http.perform(get(OUTBOX).param("limit", "100").header("Authorization", worker))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].type").value("AppointmentCreated"))
-                .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].version").value(1))
+                .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].version").value(2))
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].aggregateType").value("appointment"))
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].barbershopId").value(shop.toString()))
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].correlationId").value("corr-book"))

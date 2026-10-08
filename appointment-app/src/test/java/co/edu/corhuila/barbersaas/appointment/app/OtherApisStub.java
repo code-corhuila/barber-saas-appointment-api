@@ -15,8 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * A stand-in for barbershop-api and schedule-api on a local port, answering like their contracts: it
- * reads the tenant from the forwarded token, so another barbershop's barber or service answers 404.
+ * A stand-in for barbershop-api, schedule-api and loyalty-api on a local port, answering like their
+ * contracts: it reads the tenant from the forwarded token, so another barbershop's barber or service
+ * answers 404 and only that barbershop's coupons are listed.
  */
 final class OtherApisStub {
 
@@ -25,6 +26,9 @@ final class OtherApisStub {
     final Map<UUID, Service> services = new ConcurrentHashMap<>();
     /** Barber → its barbershop. Every barber offers the same starts every day. */
     final Map<UUID, UUID> barbers = new ConcurrentHashMap<>();
+    /** Client → their ACTIVE reward coupon, and the coupon → its barbershop (DEC-APPT-09). */
+    final Map<UUID, UUID> coupons = new ConcurrentHashMap<>();
+    final Map<UUID, UUID> couponShops = new ConcurrentHashMap<>();
     volatile List<String> starts = List.of("09:00", "09:30", "10:00", "10:30");
     private final ObjectMapper json = new ObjectMapper();
     private final HttpServer server;
@@ -57,6 +61,11 @@ final class OtherApisStub {
                 body = "{\"id\":\"" + id + "\",\"durationMinutes\":" + s.durationMinutes() + ",\"priceCents\":"
                         + s.priceCents() + ",\"isActive\":true}";
             }
+        } else if (path.equals("/api/v1/loyalty/coupons") && tenant != null) {
+            UUID coupon = coupons.get(UUID.fromString(query.get("clientId")));
+            boolean listed = coupon != null && tenant.equals(couponShops.get(coupon)) && "ACTIVE".equals(query.get("status"));
+            body = "{\"data\":[" + (listed ? "{\"id\":\"" + coupon + "\",\"status\":\"ACTIVE\"}" : "")
+                    + "],\"meta\":{\"page\":1,\"limit\":1,\"total\":" + (listed ? 1 : 0) + ",\"totalPages\":1}}";
         } else if (path.equals("/api/v1/availability")) {
             UUID barber = UUID.fromString(query.get("barberId"));
             if (tenant != null && tenant.equals(barbers.get(barber))) {
