@@ -57,6 +57,25 @@ class AppointmentTest {
         assertEquals(2_500_000, a.price().cents());
         assertEquals(CLIENT, a.createdBy());
         assertEquals(INSTANT, a.createdAt());
+        assertNull(a.couponId());
+    }
+
+    @Test
+    void aRewardCouponMakesThePriceSnapshotZero() {
+        UUID coupon = UUID.randomUUID();
+
+        Appointment a = Appointment.book(UUID.randomUUID(), SHOP, CLIENT, BARBER, SERVICE,
+                Slot.of(DAY, LocalTime.of(14, 30), 45), Money.ofCents(2_500_000), null, CLIENT, coupon, NOW, INSTANT);
+
+        assertEquals(0, a.price().cents());
+        assertEquals(coupon, a.couponId());
+    }
+
+    @Test
+    void aWalkInCannotCarryARewardCoupon() {
+        assertThrows(InvalidValue.class, () -> Appointment.book(UUID.randomUUID(), SHOP, null, BARBER, SERVICE,
+                Slot.of(DAY, LocalTime.of(14, 30), 45), Money.ofCents(2_500_000), null, CLIENT, UUID.randomUUID(),
+                NOW, INSTANT));
     }
 
     @Test
