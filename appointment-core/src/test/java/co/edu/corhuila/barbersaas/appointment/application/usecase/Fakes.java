@@ -9,6 +9,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.Clock;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.IdGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.RewardCoupons;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
@@ -37,6 +38,8 @@ final class Fakes {
         final List<OutboxEvent> outbox = new ArrayList<>();
         /** Simulates a concurrent booking that wins the race after the overlap check. */
         boolean loseTheRace;
+        /** Simulates a concurrent booking that applied the same coupon first (uq_appointment_coupon). */
+        boolean loseTheCoupon;
 
         @Override
         public Optional<Appointment> findById(UUID tenant, UUID id) {
@@ -92,6 +95,9 @@ final class Fakes {
             if (loseTheRace) {
                 throw new SlotTaken();
             }
+            if (loseTheCoupon) {
+                throw new CouponTaken();
+            }
             rows.put(appointment.id(), appointment);
             keys.put(key.key() + " " + key.operation(), new Idempotency.Stored(appointment.id(), key.requestHash()));
             outbox.addAll(events);
@@ -139,6 +145,22 @@ final class Fakes {
         @Override
         public Instant now() {
             return now;
+        }
+    }
+
+    static final class Coupons implements RewardCoupons {
+        /** Client → their ACTIVE coupon in the caller's barbershop. */
+        final Map<UUID, UUID> active = new HashMap<>();
+        final List<UUID> askedFor = new ArrayList<>();
+        RuntimeException failure;
+
+        @Override
+        public Optional<UUID> activeCoupon(Caller caller, UUID clientId) {
+            askedFor.add(clientId);
+            if (failure != null) {
+                throw failure;
+            }
+            return Optional.ofNullable(active.get(clientId));
         }
     }
 
