@@ -25,6 +25,13 @@ public interface AppointmentRepository {
         }
     }
 
+    /** A concurrent booking applied the same reward coupon first: uq_appointment_coupon (DEC-APPT-09). */
+    class CouponTaken extends RuntimeException {
+        public CouponTaken() {
+            super("The reward coupon was applied to another appointment");
+        }
+    }
+
     /** Another request stored the same Idempotency-Key first. */
     class KeyTaken extends RuntimeException {
         public KeyTaken() {

@@ -9,6 +9,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller.Role;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Created;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.CouponTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.KeyTaken;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.Query;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository.SlotTaken;
@@ -19,6 +20,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCat
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Clock;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.IdGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.RewardCoupons;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.BusinessRuleViolation;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Money;
@@ -40,18 +42,21 @@ public class ManageAppointments implements AppointmentUseCases {
 
     static final String BOOK_OPERATION = "POST /api/v1/appointments";
     private static final String SLOT_TAKEN = "The barber already has an appointment at that time";
+    private static final String COUPON_TAKEN = "The reward coupon was applied to another booking; book again";
 
     private final AppointmentRepository appointments;
     private final BarbershopCatalog catalog;
     private final BarberAvailability availability;
+    private final RewardCoupons coupons;
     private final Clock clock;
     private final IdGenerator ids;
 
     public ManageAppointments(AppointmentRepository appointments, BarbershopCatalog catalog,
-                              BarberAvailability availability, Clock clock, IdGenerator ids) {
+                              BarberAvailability availability, RewardCoupons coupons, Clock clock, IdGenerator ids) {
         this.appointments = appointments;
         this.catalog = catalog;
         this.availability = availability;
+        this.coupons = coupons;
         this.clock = clock;
         this.ids = ids;
     }
@@ -79,8 +84,10 @@ public class ManageAppointments implements AppointmentUseCases {
         Policy policy = catalog.policy(caller);
         Instant now = clock.now();
         Slot slot = Slot.of(c.date(), c.startTime(), service.durationMinutes());
+        // FR-010, DEC-APPT-09: the client's active coupon pays the appointment; a walk-in has none.
+        UUID couponId = clientId == null ? null : coupons.activeCoupon(caller, clientId).orElse(null);
         Appointment appointment = Appointment.book(ids.next(), tenant, clientId, c.barberId(), c.serviceId(), slot,
-                Money.ofCents(service.priceCents()), c.notes(), bookedBy,
+                Money.ofCents(service.priceCents()), c.notes(), bookedBy, couponId,
                 LocalDateTime.ofInstant(now, policy.timezone()), now);
 
         List<LocalTime> offered = availability.freeStarts(caller, c.barberId(), c.serviceId(), c.date())
@@ -93,9 +100,11 @@ public class ManageAppointments implements AppointmentUseCases {
         }
         try {
             appointments.saveNew(appointment, new Idempotency.Key(idempotencyKey, BOOK_OPERATION, hash),
-                    List.of(Events.of(Events.CREATED, appointment, ids, now)));
+                    List.of(Events.created(appointment, ids, now)));
         } catch (SlotTaken race) {
             throw new BusinessRuleViolation(SLOT_TAKEN);
+        } catch (CouponTaken race) {
+            throw new BusinessRuleViolation(COUPON_TAKEN);
         } catch (KeyTaken race) {
             return retry(tenant, idempotencyKey, hash).orElseThrow(IdempotencyKeyReused::new);
         }
