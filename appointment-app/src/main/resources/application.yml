@@ -32,3 +32,4 @@ appointment:
   # The other domains, always through their APIs (golden rule 8, Annex J J.3.3).
   barbershop-api-url: ${BARBERSHOP_API_URL:http://barbershop-api:8080}
   schedule-api-url: ${SCHEDULE_API_URL:http://schedule-api:8080}
+  loyalty-api-url: ${LOYALTY_API_URL:http://loyalty-api:8080}
