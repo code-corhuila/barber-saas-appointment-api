@@ -16,6 +16,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller.Role;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Created;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog.CatalogService;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyFailure;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
@@ -52,6 +53,7 @@ class ManageAppointmentsTest {
     Fakes.Repository repository;
     Fakes.Catalog catalog;
     Fakes.Availability availability;
+    Fakes.Coupons coupons;
     Fakes.FixedClock clock;
     ManageAppointments appointments;
 
@@ -62,8 +64,9 @@ class ManageAppointmentsTest {
         catalog.services.put(SERVICE, new CatalogService(SERVICE, 30, 2_500_000));
         availability = new Fakes.Availability();
         availability.barbers.put(BARBER, List.of(LocalTime.of(9, 0), LocalTime.of(9, 30), LocalTime.of(10, 0)));
+        coupons = new Fakes.Coupons();
         clock = new Fakes.FixedClock(NOW);
-        appointments = new ManageAppointments(repository, catalog, availability, clock, new Fakes.Sequence());
+        appointments = new ManageAppointments(repository, catalog, availability, coupons, clock, new Fakes.Sequence());
     }
 
     BookCommand at(LocalTime start) {
@@ -197,6 +200,73 @@ class ManageAppointmentsTest {
                 LocalTime.of(9, 0), null);
 
         assertThrows(InvalidValue.class, () -> appointments.book(client, yesterday, "key-00000001"));
+    }
+
+    // --- DEC-APPT-09: the reward coupon at booking (FR-010) ------------------------------------
+
+    @Test
+    void theClientsActiveCouponPaysTheAppointmentAndTravelsInAppointmentCreated() {
+        UUID coupon = UUID.randomUUID();
+        coupons.active.put(clientId, coupon);
+
+        Appointment a = appointments.book(client, at(LocalTime.of(9, 30)), "key-00000001").value();
+
+        assertEquals(0, a.price().cents(), "the coupon pays the whole service");
+        assertEquals(coupon, a.couponId());
+        OutboxEvent created = repository.outbox.get(0);
+        assertEquals("AppointmentCreated", created.type());
+        assertEquals(coupon.toString(), created.payload().get("couponId"));
+        assertEquals(0L, created.payload().get("priceAtBookingCents"));
+        assertEquals(2, Events.version("AppointmentCreated"));
+    }
+
+    @Test
+    void withoutACouponThePriceIsTheServicesAndCouponIdIsNull() {
+        Appointment a = appointments.book(client, at(LocalTime.of(9, 30)), "key-00000001").value();
+
+        assertEquals(2_500_000, a.price().cents());
+        assertNull(a.couponId());
+        assertTrue(repository.outbox.get(0).payload().containsKey("couponId"));
+        assertNull(repository.outbox.get(0).payload().get("couponId"));
+    }
+
+    @Test
+    void staffBookingForAClientAppliesThatClientsCoupon() {
+        UUID coupon = UUID.randomUUID();
+        coupons.active.put(clientId, coupon);
+
+        Appointment a = appointments.book(admin, new BookCommand(BARBER, SERVICE, clientId, DAY, LocalTime.of(9, 0),
+                null), "key-00000001").value();
+
+        assertEquals(coupon, a.couponId());
+        assertEquals(List.of(clientId), coupons.askedFor);
+    }
+
+    @Test
+    void aWalkInNeverAsksLoyaltyForACoupon() {
+        Appointment a = appointments.book(barber, at(LocalTime.of(9, 0)), "key-00000001").value();
+
+        assertNull(a.clientId());
+        assertNull(a.couponId());
+        assertEquals(List.of(), coupons.askedFor);
+    }
+
+    @Test
+    void aCouponAppliedByAConcurrentBookingIsA422() {
+        coupons.active.put(clientId, UUID.randomUUID());
+        repository.loseTheCoupon = true;
+
+        assertThrows(BusinessRuleViolation.class,
+                () -> appointments.book(client, at(LocalTime.of(9, 30)), "key-00000001"));
+    }
+
+    @Test
+    void whenLoyaltyDoesNotAnswerTheBookingFailsInsteadOfChargingTheFullPrice() {
+        coupons.failure = new DependencyFailure("loyalty-api", "unreachable");
+
+        assertThrows(DependencyFailure.class,
+                () -> appointments.book(client, at(LocalTime.of(9, 30)), "key-00000001"));
+        assertEquals(0, repository.rows.size());
     }
 
     // --- list and get --------------------------------------------------------------------------
