@@ -19,6 +19,7 @@ import java.time.ZoneId;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -153,5 +154,35 @@ class ApiClientsTest {
         assertEquals(ZoneId.of("Pacific/Auckland"), new BarbershopZonesClient(base).zoneOf(shop));
         assertEquals("null", seenHeaders.get("Authorization"));
         assertEquals(ZoneId.of("America/Bogota"), new BarbershopZonesClient(base).zoneOf(UUID.randomUUID()));
+    }
+
+    // --- loyalty-api: the client's active reward coupon (DEC-APPT-09) ---------------------------
+
+    @Test
+    void theActiveCouponComesFromLoyaltyApiWithTheCallersToken() {
+        UUID client = UUID.randomUUID();
+        UUID coupon = UUID.randomUUID();
+        answer("/api/v1/loyalty/coupons?clientId=" + client + "&status=ACTIVE&limit=1",
+                "{\"data\":[{\"id\":\"" + coupon + "\",\"status\":\"ACTIVE\"}],\"meta\":{}}");
+
+        assertEquals(Optional.of(coupon), new LoyaltyApiClient(base).activeCoupon(caller, client));
+        assertEquals("Bearer the-token", seenHeaders.get("Authorization"));
+    }
+
+    @Test
+    void anEmptyListMeansNoCoupon() {
+        UUID client = UUID.randomUUID();
+        answer("/api/v1/loyalty/coupons?clientId=" + client + "&status=ACTIVE&limit=1", "{\"data\":[],\"meta\":{}}");
+
+        assertEquals(Optional.empty(), new LoyaltyApiClient(base).activeCoupon(caller, client));
+    }
+
+    @Test
+    void aFailingOrMissingLoyaltyApiIsAFailureNeverNoCoupon() {
+        UUID client = UUID.randomUUID();
+        answer("/api/v1/loyalty/coupons?clientId=" + client + "&status=ACTIVE&limit=1", "!500");
+
+        assertThrows(DependencyFailure.class, () -> new LoyaltyApiClient(base).activeCoupon(caller, client));
+        assertThrows(DependencyFailure.class, () -> new LoyaltyApiClient(base).activeCoupon(caller, UUID.randomUUID()));
     }
 }
