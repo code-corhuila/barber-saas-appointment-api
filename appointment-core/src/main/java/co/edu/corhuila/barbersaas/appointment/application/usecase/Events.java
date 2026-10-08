@@ -43,6 +43,14 @@ final class Events {
         return new OutboxEvent(ids.next(), a.id(), type, payload, now);
     }
 
+    /** AppointmentCreated adds the reward coupon applied, or null (DEC-APPT-09): loyalty marks it USED. */
+    static OutboxEvent created(Appointment a, IdGenerator ids, Instant now) {
+        OutboxEvent base = of(CREATED, a, ids, now);
+        Map<String, Object> payload = new LinkedHashMap<>(base.payload());
+        payload.put("couponId", a.couponId() == null ? null : a.couponId().toString());
+        return new OutboxEvent(base.id(), base.aggregateId(), CREATED, payload, now);
+    }
+
     /** AppointmentCompleted adds who completed it (DEC-APPT-08): loyalty grants the sticker in their name. */
     static OutboxEvent completed(Appointment a, String completedBy, IdGenerator ids, Instant now) {
         OutboxEvent base = of(COMPLETED, a, ids, now);
@@ -51,8 +59,11 @@ final class Events {
         return new OutboxEvent(base.id(), base.aggregateId(), COMPLETED, payload, now);
     }
 
-    /** The envelope version of each event: AppointmentCompleted gained completedBy (DEC-APPT-08). */
+    /**
+     * The envelope version of each event: AppointmentCompleted gained completedBy (DEC-APPT-08) and
+     * AppointmentCreated gained couponId (DEC-APPT-09).
+     */
     static int version(String type) {
-        return COMPLETED.equals(type) ? 2 : 1;
+        return COMPLETED.equals(type) || CREATED.equals(type) ? 2 : 1;
     }
 }
