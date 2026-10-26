@@ -82,6 +82,15 @@ sticker), and income is recorded by the staff in finance-inventory, which consum
 `status` is `SUSPENDED` or `CANCELLED` it answers `422` "Esta barbería no está recibiendo reservas"
 and stores nothing. Appointments booked before keep every transition.
 
+**Reviews (`DEC-APPT-11`):** `POST /api/v1/appointments/{id}/review` (role `CLIENT`, own appointment
+only, read by the token's `sub`) stores one rating from 1 to 5 with an optional comment of up to 500
+characters for a `COMPLETED` appointment; the second answers `422` "Esta cita ya fue calificada", also
+when two requests race (`uq_review_appointment`). The display name ("María G.") is read once from
+identity-auth's `GET /internal/v1/users/{id}` with this service's own `SERVICE_TOKEN`
+(`IDENTITY_AUTH_API_URL`); if identity-auth does not answer, the review is not stored and the answer
+is `503`. `GET /api/v1/reviews?barbershopId=&barberId=` is the only anonymous route: newest first,
+with `summary {averageRating, reviewCount}` computed on read.
+
 **Reward coupon at booking (`DEC-APPT-09`, FR-010):** when the appointment has a client (never a
 walk-in), booking asks loyalty-api for that client's `ACTIVE` coupon. If there is one, the appointment
 is stored at `priceAtBookingCents = 0` with its `couponId`, and `AppointmentCreated` (envelope `version`
