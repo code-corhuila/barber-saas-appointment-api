@@ -8,6 +8,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
+import co.edu.corhuila.barbersaas.appointment.domain.model.ReminderWindow;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,7 +32,9 @@ public class InMemoryAppointmentRepository implements AppointmentRepository, Out
     private final List<OutboxEvent> outbox = new CopyOnWriteArrayList<>();
     /** Per event: its correlation id, and whether it was published or set aside as failed. */
     private final Map<UUID, Relay> relay = new ConcurrentHashMap<>();
-    private final Map<UUID, Instant> reminders = new ConcurrentHashMap<>();
+    /** The reminders written, by window and appointment: reminder_sent_at and hour_reminder_sent_at. */
+    private final Map<ReminderWindow, Map<UUID, Instant>> reminders = Map.of(
+            ReminderWindow.DAY_BEFORE, new ConcurrentHashMap<>(), ReminderWindow.HOUR_BEFORE, new ConcurrentHashMap<>());
 
     private record Relay(String correlationId, Instant publishedAt, Instant failedAt, String lastError) { }
 
@@ -118,18 +121,20 @@ public class InMemoryAppointmentRepository implements AppointmentRepository, Out
     }
 
     @Override
-    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, boolean withoutReminder) {
+    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, ReminderWindow withoutReminder) {
         return rows.values().stream().filter(a -> a.status() == AppointmentStatus.CONFIRMED)
                 .filter(a -> !a.slot().date().isAfter(to) && (from == null || !a.slot().date().isBefore(from)))
-                .filter(a -> !withoutReminder || !reminders.containsKey(a.id()))
+                .filter(a -> withoutReminder == null || !reminders.get(withoutReminder).containsKey(a.id()))
                 .sorted(Comparator.comparing((Appointment a) -> a.slot().startsAt()).thenComparing(Appointment::id))
                 .toList();
     }
 
     @Override
-    public synchronized boolean markReminderSent(UUID appointmentId, OutboxEvent event, Instant now) {
+    public synchronized boolean markReminderSent(UUID appointmentId, ReminderWindow window, OutboxEvent event,
+                                                 Instant now) {
         Appointment a = rows.get(appointmentId);
-        if (a == null || a.status() != AppointmentStatus.CONFIRMED || reminders.putIfAbsent(appointmentId, now) != null) {
+        if (a == null || a.status() != AppointmentStatus.CONFIRMED
+                || reminders.get(window).putIfAbsent(appointmentId, now) != null) {
             return false;
         }
         append(List.of(event));
