@@ -6,10 +6,14 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyFai
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** BarbershopCatalog over barbershop-service.yaml; barbershop-api applies the token's tenant itself. */
 public class BarbershopApiClient implements BarbershopCatalog {
+
+    /** The statuses of BarbershopStatus that take no new bookings (DEC-APPT-10). */
+    private static final Set<String> CLOSED = Set.of("SUSPENDED", "CANCELLED");
 
     private final JsonApi api;
 
@@ -26,7 +30,7 @@ public class BarbershopApiClient implements BarbershopCatalog {
                         s.path("priceCents").asLong()));
     }
 
-    /** getMyBarbershop: the time zone and the cancellation window of the token's barbershop. */
+    /** getMyBarbershop: the time zone, the cancellation window and the status of the token's barbershop. */
     @Override
     public Policy policy(Caller caller) {
         JsonNode shop = api.get(caller, "/api/v1/barbershops/me")
@@ -34,6 +38,7 @@ public class BarbershopApiClient implements BarbershopCatalog {
         if (!shop.path("timezone").isTextual() || !shop.path("cancellationPolicyHours").isInt()) {
             throw new DependencyFailure("barbershop-api", "the barbershop has no time zone or cancellation policy");
         }
-        return new Policy(ZoneId.of(shop.get("timezone").asText()), shop.get("cancellationPolicyHours").asInt());
+        return new Policy(ZoneId.of(shop.get("timezone").asText()), shop.get("cancellationPolicyHours").asInt(),
+                !CLOSED.contains(shop.path("status").asText()));
     }
 }

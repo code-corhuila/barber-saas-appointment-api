@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.MDC;
 
 /** The clients against a stub of barbershop-api and schedule-api on a local port. */
@@ -95,9 +97,19 @@ class ApiClientsTest {
 
     @Test
     void thePolicyIsTheTimeZoneAndCancellationWindowOfTheTokensBarbershop() {
-        answer("/api/v1/barbershops/me", "{\"timezone\":\"America/Bogota\",\"cancellationPolicyHours\":4}");
+        answer("/api/v1/barbershops/me",
+                "{\"timezone\":\"America/Bogota\",\"cancellationPolicyHours\":4,\"status\":\"ACTIVE\"}");
 
-        assertEquals(new Policy(ZoneId.of("America/Bogota"), 4), new BarbershopApiClient(base).policy(caller));
+        assertEquals(new Policy(ZoneId.of("America/Bogota"), 4, true), new BarbershopApiClient(base).policy(caller));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"TRIAL,true", "ACTIVE,true", "SUSPENDED,false", "CANCELLED,false"})
+    void onlyASuspendedOrCancelledBarbershopTakesNoBookings(String status, boolean takesBookings) {
+        answer("/api/v1/barbershops/me",
+                "{\"timezone\":\"UTC\",\"cancellationPolicyHours\":2,\"status\":\"" + status + "\"}");
+
+        assertEquals(takesBookings, new BarbershopApiClient(base).policy(caller).takesBookings());
     }
 
     @Test
