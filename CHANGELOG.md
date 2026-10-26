@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-User stories: code-corhuila/barber-saas-docs#129
+User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130
 
 ### Added
 
 - booking: refuse a booking at a suspended or cancelled barbershop
+- domain: add the review of a completed appointment
+- review: review a completed appointment once and list a barbershop's reviews
+- http: read the client's name from identity-auth with the service token
+- http: expose the review of an appointment and the public reviews list
 
 ## [2.0.0] - 2026-10-08
 
