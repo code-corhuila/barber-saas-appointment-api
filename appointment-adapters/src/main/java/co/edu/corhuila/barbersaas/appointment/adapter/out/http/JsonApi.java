@@ -47,6 +47,11 @@ final class JsonApi {
         return get(pathAndQuery, "Bearer " + caller.credential());
     }
 
+    /** A read with this service's own token, for another domain's internal operation (ADR-014). */
+    Optional<JsonNode> getAsService(String pathAndQuery, String serviceToken) {
+        return get(pathAndQuery, "Bearer " + serviceToken);
+    }
+
     /** An anonymous read of the other domain (DEC-SHOP-02): no token is sent. */
     Optional<JsonNode> getPublic(String pathAndQuery) {
         return get(pathAndQuery, null);
