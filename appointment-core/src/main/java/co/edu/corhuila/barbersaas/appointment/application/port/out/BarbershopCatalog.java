@@ -14,8 +14,11 @@ public interface BarbershopCatalog {
     /** The service's current price and duration; the price becomes the snapshot (INV-APPT-002). */
     record CatalogService(UUID id, int durationMinutes, long priceCents) { }
 
-    /** The barbershop's local time zone and the client's cancellation window (INV-APPT-003). */
-    record Policy(ZoneId timezone, int cancellationPolicyHours) { }
+    /**
+     * The barbershop's local time zone, the client's cancellation window (INV-APPT-003) and whether it
+     * takes new bookings: a SUSPENDED or CANCELLED barbershop does not (DEC-APPT-10).
+     */
+    record Policy(ZoneId timezone, int cancellationPolicyHours, boolean takesBookings) { }
 
     /** Empty when the service does not exist, is inactive or belongs to another barbershop (404). */
     Optional<CatalogService> service(Caller caller, UUID serviceId);
