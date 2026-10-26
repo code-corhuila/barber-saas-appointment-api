@@ -43,7 +43,7 @@ that is `barber-saas-appointment-db`.
 | `POST …/{id}/cancel` | `CLIENT` their own, outside the barbershop's window; staff always |
 | `GET /internal/v1/busy-slots?barbershopId&barberId&date` (internal network only) | the service token of `barber-saas-schedule-api` only |
 | `GET /internal/v1/outbox-events?limit`, `POST …/{id}/published`, `POST …/{id}/failed` | the service token of `barber-saas-worker` only |
-| `POST /internal/v1/appointments/reminders-due?limit`, `POST …/no-shows?limit` | the service token of `barber-saas-worker` only |
+| `POST /internal/v1/appointments/reminders-due?window&limit`, `POST …/no-shows?limit` | the service token of `barber-saas-worker` only |
 | `GET /health` | liveness, no token |
 
 Rules: the end and the price come from the service and the price never changes afterwards
@@ -106,6 +106,12 @@ tomorrow's `CONFIRMED` appointments (once each, `reminder_sent_at`) and the no-s
 appointments dated before today, both judged in each barbershop's local date. The zone comes from the
 barbershop's public detail, `America/Bogota` when it is no longer visible (barber-saas-docs#88). Each
 job answers `{processed, remaining}`.
+
+**One-hour reminder (`DEC-APPT-12`):** `reminders-due?window=HOUR_BEFORE`, which the worker calls every
+5 minutes, writes `AppointmentReminderDue` for the `CONFIRMED` appointments that start in 55 to 65
+minutes in the barbershop's local time, once each (`hour_reminder_sent_at`, in the same transaction as
+the event). Without `window` it is `DAY_BEFORE`, as before. The event is envelope `version` 2 and
+carries `window` for both; a cancelled appointment is no longer `CONFIRMED`, so it gets neither.
 
 ### How to start it
 
