@@ -112,7 +112,7 @@ final class Fakes {
 
     static final class Catalog implements BarbershopCatalog {
         final Map<UUID, CatalogService> services = new HashMap<>();
-        Policy policy = new Policy(ZoneId.of("America/Bogota"), 4);
+        Policy policy = new Policy(ZoneId.of("America/Bogota"), 4, true);
 
         @Override
         public Optional<CatalogService> service(Caller caller, UUID serviceId) {
