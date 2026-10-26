@@ -9,6 +9,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Money;
+import co.edu.corhuila.barbersaas.appointment.domain.model.ReminderWindow;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -180,7 +181,7 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
     }
 
     @Override
-    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, boolean withoutReminder) {
+    public List<Appointment> confirmedBetween(LocalDate from, LocalDate to, ReminderWindow withoutReminder) {
         StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + " FROM appointment.appointment "
                 + "WHERE status = 'CONFIRMED' AND appointment_date <= ?");
         List<Object> args = new ArrayList<>(List.of(to));
@@ -188,24 +189,30 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
             sql.append(" AND appointment_date >= ?");
             args.add(from);
         }
-        if (withoutReminder) {
-            sql.append(" AND reminder_sent_at IS NULL");
+        if (withoutReminder != null) {
+            sql.append(" AND ").append(mark(withoutReminder)).append(" IS NULL");
         }
         sql.append(" ORDER BY appointment_date, start_time, id");
         return jdbc.query(sql.toString(), (rs, n) -> map(rs), args.toArray());
     }
 
     @Override
-    public boolean markReminderSent(UUID appointmentId, OutboxEvent event, Instant now) {
+    public boolean markReminderSent(UUID appointmentId, ReminderWindow window, OutboxEvent event, Instant now) {
+        String mark = mark(window);
         Boolean marked = tx.execute(status -> {
-            int changed = jdbc.update("UPDATE appointment.appointment SET reminder_sent_at = ? "
-                    + "WHERE id = ? AND status = 'CONFIRMED' AND reminder_sent_at IS NULL", Timestamp.from(now), appointmentId);
+            int changed = jdbc.update("UPDATE appointment.appointment SET " + mark + " = ? "
+                    + "WHERE id = ? AND status = 'CONFIRMED' AND " + mark + " IS NULL", Timestamp.from(now), appointmentId);
             if (changed == 1) {
                 insert(List.of(event));
             }
             return changed == 1;
         });
         return Boolean.TRUE.equals(marked);
+    }
+
+    /** The column of each window (DEC-APPT-12); a fixed name, never a value from the request. */
+    private static String mark(ReminderWindow window) {
+        return window == ReminderWindow.HOUR_BEFORE ? "hour_reminder_sent_at" : "reminder_sent_at";
     }
 
     /** idx_outbox_event_unpublished serves this read: pending only, oldest first. */
