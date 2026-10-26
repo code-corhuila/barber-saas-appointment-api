@@ -16,6 +16,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller.Role;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Created;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog.CatalogService;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog.Policy;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyFailure;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
@@ -26,6 +27,7 @@ import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.Inval
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -203,6 +205,31 @@ class ManageAppointmentsTest {
     }
 
     // --- DEC-APPT-09: the reward coupon at booking (FR-010) ------------------------------------
+
+    @Test
+    void aSuspendedOrCancelledBarbershopTakesNoBookingAndStoresNothing() {
+        catalog.policy = new Policy(ZoneId.of("America/Bogota"), 4, false);
+
+        BusinessRuleViolation refused = assertThrows(BusinessRuleViolation.class, () -> bookedByClient());
+
+        assertEquals("Esta barbería no está recibiendo reservas", refused.getMessage());
+        assertTrue(repository.rows.isEmpty());
+        assertTrue(repository.keys.isEmpty());
+        assertTrue(repository.outbox.isEmpty());
+    }
+
+    @Test
+    void anAppointmentBookedBeforeTheSuspensionKeepsEveryTransition() {
+        Appointment a = bookedByClient();
+        Appointment other = appointments.book(admin, new BookCommand(BARBER, SERVICE, clientId, DAY,
+                LocalTime.of(9, 0), null), "key-" + UUID.randomUUID()).value();
+        catalog.policy = new Policy(ZoneId.of("America/Bogota"), 4, false);
+
+        appointments.confirm(barber, a.id());
+        appointments.start(barber, a.id());
+        assertEquals(AppointmentStatus.COMPLETED, appointments.complete(barber, a.id()).status());
+        assertEquals(AppointmentStatus.CANCELLED, appointments.cancel(admin, other.id(), "closed").status());
+    }
 
     @Test
     void theClientsActiveCouponPaysTheAppointmentAndTravelsInAppointmentCreated() {
