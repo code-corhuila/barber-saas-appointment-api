@@ -5,23 +5,30 @@ import co.edu.corhuila.barbersaas.appointment.adapter.in.http.CorrelationFilter;
 import co.edu.corhuila.barbersaas.appointment.adapter.in.http.Rs256Verifier;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.BarbershopZonesClient;
+import co.edu.corhuila.barbersaas.appointment.adapter.out.http.IdentityAuthClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.LoyaltyApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.http.ScheduleApiClient;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.InMemoryAppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.InMemoryReviewRepository;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.JdbcAppointmentRepository;
+import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.JdbcReviewRepository;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.SystemClock;
 import co.edu.corhuila.barbersaas.appointment.adapter.out.persistence.UuidGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.BusySlotUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.OutboxRelayUseCases;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.ReviewUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.AppointmentRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarberAvailability;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.RewardCoupons;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxStore;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.ReviewRepository;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.UserDirectory;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.ManageAppointments;
+import co.edu.corhuila.barbersaas.appointment.application.usecase.ManageReviews;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.QueryBusySlots;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.RelayOutbox;
 import co.edu.corhuila.barbersaas.appointment.application.usecase.RunDailyJobs;
@@ -45,9 +52,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Configuration
 public class AppointmentConfiguration {
 
+    /** The two stores of the appointment schema, on one pool. */
+    record Stores(AppointmentRepository appointments, ReviewRepository reviews) { }
+
     /** JDBC over the appointment schema as appointment_app, or in memory when DATABASE_URL is empty. */
     @Bean
-    AppointmentRepository appointmentRepository(@Value("${appointment.database.url:}") String url,
+    Stores stores(@Value("${appointment.database.url:}") String url,
                                                 @Value("${appointment.database.user:}") String user,
                                                 @Value("${appointment.database.password:}") String password,
                                                 @Value("${appointment.database.pool-max:10}") int poolMax,
@@ -55,7 +65,7 @@ public class AppointmentConfiguration {
                                                 int statementTimeoutMs,
                                                 ObjectMapper json) {
         if (url.isBlank()) {
-            return new InMemoryAppointmentRepository();
+            return new Stores(new InMemoryAppointmentRepository(), new InMemoryReviewRepository());
         }
         HikariConfig pool = new HikariConfig();
         pool.setJdbcUrl(url);
@@ -66,8 +76,32 @@ public class AppointmentConfiguration {
         pool.setMaxLifetime(Duration.ofMinutes(30).toMillis());
         pool.setConnectionInitSql("SET statement_timeout = " + statementTimeoutMs);
         HikariDataSource dataSource = new HikariDataSource(pool);
-        return new JdbcAppointmentRepository(new JdbcTemplate(dataSource),
-                new TransactionTemplate(new DataSourceTransactionManager(dataSource)), json);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        return new Stores(new JdbcAppointmentRepository(jdbc,
+                new TransactionTemplate(new DataSourceTransactionManager(dataSource)), json),
+                new JdbcReviewRepository(jdbc));
+    }
+
+    @Bean
+    AppointmentRepository appointmentRepository(Stores stores) {
+        return stores.appointments();
+    }
+
+    @Bean
+    ReviewRepository reviewRepository(Stores stores) {
+        return stores.reviews();
+    }
+
+    /** The client's name for a review, with this service's own token (ADR-014). */
+    @Bean
+    UserDirectory userDirectory(@Value("${appointment.identity-auth-api-url}") String url,
+                                @Value("${appointment.service-token:}") String serviceToken) {
+        return new IdentityAuthClient(url, serviceToken);
+    }
+
+    @Bean
+    ReviewUseCases reviewUseCases(AppointmentRepository appointments, ReviewRepository reviews, UserDirectory users) {
+        return new ManageReviews(appointments, reviews, users, new SystemClock(), new UuidGenerator());
     }
 
     @Bean
