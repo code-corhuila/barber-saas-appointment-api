@@ -9,6 +9,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller.Role;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog.CatalogService;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopCatalog.Policy;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyFailure;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyUnavailable;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -196,5 +197,30 @@ class ApiClientsTest {
 
         assertThrows(DependencyFailure.class, () -> new LoyaltyApiClient(base).activeCoupon(caller, client));
         assertThrows(DependencyFailure.class, () -> new LoyaltyApiClient(base).activeCoupon(caller, UUID.randomUUID()));
+    }
+
+    @Test
+    void theClientsNameComesFromIdentityAuthWithThisServicesOwnToken() {
+        UUID user = UUID.randomUUID();
+        answer("/internal/v1/users/" + user, "{\"id\":\"" + user + "\",\"fullName\":\"Maria Gomez\",\"role\":\"CLIENT\","
+                + "\"barbershopId\":null,\"isActive\":true}");
+
+        assertEquals("Maria Gomez", new IdentityAuthClient(base, "service-token").fullName(user));
+        assertEquals("Bearer service-token", seenHeaders.get("Authorization"), "never the client's token");
+    }
+
+    @Test
+    void identityAuthDownAnUnknownUserOrNoServiceTokenIsUnavailable() {
+        UUID user = UUID.randomUUID();
+        IdentityAuthClient client = new IdentityAuthClient(base, "service-token");
+
+        assertThrows(DependencyUnavailable.class, () -> client.fullName(user), "404");
+        answer("/internal/v1/users/" + user, "!503");
+        assertThrows(DependencyUnavailable.class, () -> client.fullName(user));
+        answer("/internal/v1/users/" + user, "!403");
+        assertThrows(DependencyUnavailable.class, () -> client.fullName(user));
+        int before = calls.get();
+        assertThrows(DependencyUnavailable.class, () -> new IdentityAuthClient(base, "").fullName(user));
+        assertEquals(before, calls.get(), "without SERVICE_TOKEN nothing is called");
     }
 }
