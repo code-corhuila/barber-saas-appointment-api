@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+User stories: code-corhuila/barber-saas-docs#129
+
+### Added
+
+- booking: refuse a booking at a suspended or cancelled barbershop
+
 ## [2.0.0] - 2026-10-08
 
 User stories: code-corhuila/barber-saas-docs#4, code-corhuila/barber-saas-docs#5, code-corhuila/barber-saas-docs#8, code-corhuila/barber-saas-docs#13, code-corhuila/barber-saas-docs#59, code-corhuila/barber-saas-docs#88

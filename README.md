@@ -78,6 +78,10 @@ unreachable or answers 502/503/504; a failure answers `500` instead of a guessed
 Completing no longer writes the income to finance: loyalty consumes `AppointmentCompleted` (the
 sticker), and income is recorded by the staff in finance-inventory, which consumes no events.
 
+**Suspended barbershop (`DEC-APPT-10`):** booking reads the token's barbershop first; when its
+`status` is `SUSPENDED` or `CANCELLED` it answers `422` "Esta barbería no está recibiendo reservas"
+and stores nothing. Appointments booked before keep every transition.
+
 **Reward coupon at booking (`DEC-APPT-09`, FR-010):** when the appointment has a client (never a
 walk-in), booking asks loyalty-api for that client's `ACTIVE` coupon. If there is one, the appointment
 is stored at `priceAtBookingCents = 0` with its `couponId`, and `AppointmentCreated` (envelope `version`
