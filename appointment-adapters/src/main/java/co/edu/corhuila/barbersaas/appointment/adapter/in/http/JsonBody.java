@@ -105,6 +105,17 @@ final class JsonBody {
         }
     }
 
+    /** A required integer between {@code min} and {@code max}, such as the rating of a review. */
+    int integer(String field, int min, int max) {
+        JsonNode v = node.get(field);
+        if (v == null || !v.isIntegralNumber() || v.asLong() < min || v.asLong() > max) {
+            errors.add(new FieldError(prefix + field, v == null ? "required"
+                    : "an integer between " + min + " and " + max));
+            return min;
+        }
+        return v.asInt();
+    }
+
     /** Throws every collected error at once, as one 400. */
     void validate() {
         if (!errors.isEmpty()) {

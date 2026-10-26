@@ -18,6 +18,9 @@ services:
       SCHEDULE_API_URL: http://schedule-api:8080
       # The client's active reward coupon at booking (DEC-APPT-09).
       LOYALTY_API_URL: http://loyalty-api:8080
+      # The client's name of a review (DEC-APPT-11), read with this service's own token (ADR-014).
+      IDENTITY_AUTH_API_URL: http://identity-auth-api:8080
+      SERVICE_TOKEN: ${APPOINTMENT_SERVICE_TOKEN:?run barber-saas-infra-postgres/scripts/dev-keys.sh}
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && printf \"GET /health HTTP/1.0\r\n\r\n\" >&3 && grep -q ok <&3'"]
       interval: 5s

@@ -33,6 +33,8 @@ abstract class HttpTest {
         registry.add("appointment.barbershop-api-url", OTHER_APIS::url);
         registry.add("appointment.schedule-api-url", OTHER_APIS::url);
         registry.add("appointment.loyalty-api-url", OTHER_APIS::url);
+        registry.add("appointment.identity-auth-api-url", OTHER_APIS::url);
+        registry.add("appointment.service-token", () -> serviceBearer("barber-saas-appointment-api").substring(7));
         registry.add("JWT_PUBLIC_KEY", () -> "-----BEGIN PUBLIC KEY-----\n"
                 + Base64.getMimeEncoder().encodeToString(KEYS.getPublic().getEncoded()) + "\n-----END PUBLIC KEY-----");
     }
