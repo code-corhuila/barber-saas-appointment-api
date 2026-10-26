@@ -11,12 +11,14 @@ import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Validates the bearer token on every route under /api/ (nothing in appointment-service.yaml is
- * anonymous) and under /internal/ (authentication.md, "Internal operations": never anonymous).
+ * Validates the bearer token on every route under /api/ and under /internal/ (authentication.md,
+ * "Internal operations": never anonymous). The one anonymous route is GET /api/v1/reviews, public
+ * discovery data like the catalog of barbershop-api (DEC-APPT-11).
  */
 public class AuthFilter extends OncePerRequestFilter {
 
     public static final String CALLER_ATTRIBUTE = "auth.caller";
+    static final String PUBLIC_REVIEWS = "/api/v1/reviews";
 
     private final Rs256Verifier verifier;
     private final ObjectMapper json;
@@ -29,6 +31,9 @@ public class AuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        if ("GET".equals(request.getMethod()) && PUBLIC_REVIEWS.equals(path)) {
+            return true;
+        }
         return !path.startsWith("/api/") && !path.startsWith("/internal/");
     }
 
