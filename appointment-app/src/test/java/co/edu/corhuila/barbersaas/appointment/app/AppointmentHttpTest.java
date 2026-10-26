@@ -162,6 +162,21 @@ class AppointmentHttpTest extends HttpTest {
     }
 
     @Test
+    void aSuspendedBarbershopAnswers422WithTheMessageTheAppShows() throws Exception {
+        String before = bookedId("09:00");
+        OTHER_APIS.statuses.put(shop, "SUSPENDED");
+        try {
+            book(client, "key-00000009", booking("10:00"))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error").value("BUSINESS_RULE_VIOLATION"))
+                    .andExpect(jsonPath("$.message").value("Esta barbería no está recibiendo reservas"));
+            action(staff, before, "confirm").andExpect(status().isOk());
+        } finally {
+            OTHER_APIS.statuses.remove(shop);
+        }
+    }
+
+    @Test
     void aTimeTheBarberDoesNotOfferIs422() throws Exception {
         book(client, "key-00000009", booking("15:00")).andExpect(status().isUnprocessableEntity());
     }

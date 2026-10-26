@@ -30,6 +30,8 @@ final class OtherApisStub {
     final Map<UUID, UUID> coupons = new ConcurrentHashMap<>();
     final Map<UUID, UUID> couponShops = new ConcurrentHashMap<>();
     volatile List<String> starts = List.of("09:00", "09:30", "10:00", "10:30");
+    /** Barbershop → its status, when it is not ACTIVE (DEC-APPT-10). */
+    final Map<UUID, String> statuses = new ConcurrentHashMap<>();
     private final ObjectMapper json = new ObjectMapper();
     private final HttpServer server;
 
@@ -53,7 +55,8 @@ final class OtherApisStub {
         Map<String, String> query = query(exchange.getRequestURI().getRawQuery());
         String body = null;
         if (path.equals("/api/v1/barbershops/me") && tenant != null) {
-            body = "{\"timezone\":\"America/Bogota\",\"cancellationPolicyHours\":4}";
+            body = "{\"timezone\":\"America/Bogota\",\"cancellationPolicyHours\":4,\"status\":\""
+                    + statuses.getOrDefault(tenant, "ACTIVE") + "\"}";
         } else if (path.startsWith("/api/v1/services/")) {
             UUID id = UUID.fromString(path.substring("/api/v1/services/".length()));
             Service s = services.get(id);
