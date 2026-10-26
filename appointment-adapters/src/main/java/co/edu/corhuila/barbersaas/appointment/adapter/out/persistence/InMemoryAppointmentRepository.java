@@ -41,6 +41,11 @@ public class InMemoryAppointmentRepository implements AppointmentRepository, Out
     }
 
     @Override
+    public Optional<Appointment> findOfClient(UUID clientId, UUID id) {
+        return Optional.ofNullable(rows.get(id)).filter(a -> clientId.equals(a.clientId()));
+    }
+
+    @Override
     public Page<Appointment> page(UUID tenant, Query q, Page.Request page) {
         return Page.of(rows.values().stream()
                 .filter(a -> a.barbershopId().equals(tenant))

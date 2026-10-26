@@ -47,6 +47,11 @@ final class Fakes {
         }
 
         @Override
+        public Optional<Appointment> findOfClient(UUID clientId, UUID id) {
+            return Optional.ofNullable(rows.get(id)).filter(a -> clientId.equals(a.clientId()));
+        }
+
+        @Override
         public Page<Appointment> page(UUID tenant, Query q, Page.Request page) {
             List<Appointment> all = rows.values().stream()
                     .filter(a -> a.barbershopId().equals(tenant))
@@ -170,4 +175,5 @@ final class Fakes {
             return UUID.randomUUID();
         }
     }
+
 }

@@ -59,6 +59,16 @@ abstract class RepositoryContract {
     }
 
     @Test
+    void aClientFindsTheirOwnAppointmentOfAnyBarbershopAndNoOneElses() {
+        Appointment a = at(LocalTime.of(7, 0));
+        repository().saveNew(a, key(), List.of());
+
+        assertEquals(a.id(), repository().findOfClient(client, a.id()).orElseThrow().id());
+        assertTrue(repository().findOfClient(UUID.randomUUID(), a.id()).isEmpty());
+        assertTrue(repository().findOfClient(client, UUID.randomUUID()).isEmpty());
+    }
+
+    @Test
     void theRewardCouponIsStoredAndReadBack() {
         UUID coupon = UUID.randomUUID();
         Appointment a = paidWith(coupon, LocalTime.of(11, 0));
