@@ -1,6 +1,7 @@
 package co.edu.corhuila.barbersaas.appointment.application.port.out;
 
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.ReminderWindow;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -14,13 +15,15 @@ public interface DailyJobsStore {
 
     /**
      * CONFIRMED appointments of every barbershop dated from {@code from} (null: no lower bound) to
-     * {@code to}, both inclusive, oldest first; only those without a reminder when {@code withoutReminder}.
+     * {@code to}, both inclusive, oldest first; only those without the reminder of
+     * {@code withoutReminder} when it is set (null: all of them).
      */
-    List<Appointment> confirmedBetween(LocalDate from, LocalDate to, boolean withoutReminder);
+    List<Appointment> confirmedBetween(LocalDate from, LocalDate to, ReminderWindow withoutReminder);
 
     /**
-     * Sets reminder_sent_at and writes the event in ONE transaction, only if the appointment is still
-     * CONFIRMED with no reminder; false when another call already did it.
+     * Sets the mark of the window (reminder_sent_at or hour_reminder_sent_at) and writes the event in ONE
+     * transaction, only if the appointment is still CONFIRMED without that reminder; false when another
+     * call already did it.
      */
-    boolean markReminderSent(UUID appointmentId, OutboxEvent event, Instant now);
+    boolean markReminderSent(UUID appointmentId, ReminderWindow window, OutboxEvent event, Instant now);
 }

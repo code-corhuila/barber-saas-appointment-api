@@ -3,6 +3,7 @@ package co.edu.corhuila.barbersaas.appointment.application.usecase;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.IdGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.ReminderWindow;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,7 +20,7 @@ final class Events {
     static final String CANCELLED = "AppointmentCancelled";
     static final String NO_SHOW = "AppointmentMarkedNoShow";
     static final String COMPLETED = "AppointmentCompleted";
-    /** Written by the reminder job the day before (DEC-APPT-07); notifications sends the REMINDER. */
+    /** Written by the reminder job (DEC-APPT-07, DEC-APPT-12); notifications sends the REMINDER. */
     static final String REMINDER_DUE = "AppointmentReminderDue";
 
     private Events() {
@@ -59,11 +60,20 @@ final class Events {
         return new OutboxEvent(base.id(), base.aggregateId(), COMPLETED, payload, now);
     }
 
+    /** AppointmentReminderDue adds its window (DEC-APPT-12): the day before or the hour before. */
+    static OutboxEvent reminder(Appointment a, ReminderWindow window, IdGenerator ids, Instant now) {
+        OutboxEvent base = of(REMINDER_DUE, a, ids, now);
+        Map<String, Object> payload = new LinkedHashMap<>(base.payload());
+        payload.put("window", window.name());
+        return new OutboxEvent(base.id(), base.aggregateId(), REMINDER_DUE, payload, now);
+    }
+
     /**
-     * The envelope version of each event: AppointmentCompleted gained completedBy (DEC-APPT-08) and
-     * AppointmentCreated gained couponId (DEC-APPT-09).
+     * The envelope version of each event: AppointmentCompleted gained completedBy (DEC-APPT-08),
+     * AppointmentCreated gained couponId (DEC-APPT-09) and AppointmentReminderDue gained window
+     * (DEC-APPT-12). Fields are only added.
      */
     static int version(String type) {
-        return COMPLETED.equals(type) || CREATED.equals(type) ? 2 : 1;
+        return COMPLETED.equals(type) || CREATED.equals(type) || REMINDER_DUE.equals(type) ? 2 : 1;
     }
 }

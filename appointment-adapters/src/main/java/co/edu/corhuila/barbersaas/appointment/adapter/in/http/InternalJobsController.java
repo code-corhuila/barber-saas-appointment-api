@@ -1,8 +1,12 @@
 package co.edu.corhuila.barbersaas.appointment.adapter.in.http;
 
+import co.edu.corhuila.barbersaas.appointment.adapter.in.http.ApiError.FieldError;
+import co.edu.corhuila.barbersaas.appointment.adapter.in.http.ApiError.ValidationException;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCases;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCases.JobResult;
+import co.edu.corhuila.barbersaas.appointment.domain.model.ReminderWindow;
+import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,11 +27,27 @@ public class InternalJobsController {
         this.jobs = jobs;
     }
 
-    /** writeDueReminders: at most {@code limit} (1–100, default 20); {@code remaining} asks for another call. */
+    /**
+     * writeDueReminders: {@code window} DAY_BEFORE (default) or HOUR_BEFORE, at most {@code limit}
+     * (1–100, default 20); {@code remaining} asks for another call.
+     */
     @PostMapping("/reminders-due")
     public JobResult remindersDue(@RequestAttribute(AuthFilter.CALLER_ATTRIBUTE) Caller caller,
+                                  @RequestParam(required = false) String window,
                                   @RequestParam(required = false) Integer limit) {
-        return jobs.writeDueReminders(caller, Requests.page(1, limit).limit());
+        return jobs.writeDueReminders(caller, window(window), Requests.page(1, limit).limit());
+    }
+
+    private static ReminderWindow window(String value) {
+        if (value == null) {
+            return ReminderWindow.DAY_BEFORE;
+        }
+        try {
+            return ReminderWindow.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("the request is not valid",
+                    List.of(new FieldError("window", "one of " + List.of(ReminderWindow.values()))));
+        }
     }
 
     /** markNoShows: at most {@code limit} (1–100, default 20). */

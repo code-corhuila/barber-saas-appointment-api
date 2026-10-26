@@ -45,6 +45,45 @@ class InternalJobsHttpTest extends HttpTest {
         return id;
     }
 
+    /** A CONFIRMED appointment that starts in 60 minutes, Bogotá time; the schedule offers that start. */
+    private String confirmedInAnHour() throws Exception {
+        java.time.LocalDateTime start = java.time.LocalDateTime.now(ZoneId.of("America/Bogota")).plusMinutes(60)
+                .withSecond(0).withNano(0);
+        // A 30-minute appointment must end the same day: from 22:30 in Bogota there is no such start.
+        org.junit.jupiter.api.Assumptions.assumeTrue(start.toLocalTime().isBefore(java.time.LocalTime.of(23, 30)));
+        java.util.List<String> before = OTHER_APIS.starts;
+        OTHER_APIS.starts = java.util.List.of(String.format("%02d:%02d", start.getHour(), start.getMinute()));
+        try {
+            String body = http.perform(post("/api/v1/appointments").header("Authorization", bearer("CLIENT", shop))
+                            .header("Idempotency-Key", "key-" + UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"barberId\":\"" + barber + "\",\"serviceId\":\"" + service + "\",\"date\":\""
+                                    + start.toLocalDate() + "\",\"startTime\":\"" + OTHER_APIS.starts.get(0) + "\"}"))
+                    .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+            String id = json.readTree(body).get("id").asText();
+            http.perform(post("/api/v1/appointments/" + id + "/confirm").header("Authorization", bearer("BARBER", shop)))
+                    .andExpect(status().isOk());
+            return id;
+        } finally {
+            OTHER_APIS.starts = before;
+        }
+    }
+
+    /** The windows of the pending AppointmentReminderDue of one appointment, with envelope version 2. */
+    private java.util.List<String> windows(String appointmentId) throws Exception {
+        JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "100")
+                .header("Authorization", worker)).andReturn().getResponse().getContentAsString()).get("data");
+        java.util.List<String> windows = new java.util.ArrayList<>();
+        for (JsonNode e : pending) {
+            if (e.get("type").asText().equals("AppointmentReminderDue") && e.get("aggregateId").asText().equals(appointmentId)) {
+                if (e.get("version").asInt() != 2) {
+                    throw new AssertionError("AppointmentReminderDue must be version 2");
+                }
+                windows.add(e.get("payload").get("window").asText());
+            }
+        }
+        return windows;
+    }
+
     private long reminders(String appointmentId) throws Exception {
         JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "100")
                 .header("Authorization", worker)).andReturn().getResponse().getContentAsString()).get("data");
@@ -71,6 +110,29 @@ class InternalJobsHttpTest extends HttpTest {
         if (reminders(id) != 1) {
             throw new AssertionError("expected exactly one AppointmentReminderDue for " + id);
         }
+    }
+
+    @Test
+    void theHourBeforeWindowWritesTheOneHourReminderOnceAndDayBeforeStaysTheDefault() throws Exception {
+        String soon = confirmedInAnHour();
+        String tomorrow = confirmedTomorrow();
+
+        http.perform(post("/internal/v1/appointments/reminders-due").param("window", "HOUR_BEFORE")
+                        .header("Authorization", worker))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.processed").value(greaterThanOrEqualTo(1)));
+        http.perform(post("/internal/v1/appointments/reminders-due").param("window", "HOUR_BEFORE")
+                .header("Authorization", worker)).andExpect(status().isOk());
+        if (!windows(soon).equals(java.util.List.of("HOUR_BEFORE")) || !windows(tomorrow).isEmpty()) {
+            throw new AssertionError("only the appointment of the next hour gets one HOUR_BEFORE reminder");
+        }
+
+        http.perform(post("/internal/v1/appointments/reminders-due").param("limit", "100").header("Authorization", worker))
+                .andExpect(status().isOk());
+        if (!windows(tomorrow).equals(java.util.List.of("DAY_BEFORE"))) {
+            throw new AssertionError("no window means DAY_BEFORE, as before");
+        }
+        http.perform(post("/internal/v1/appointments/reminders-due").param("window", "WEEK_BEFORE")
+                .header("Authorization", worker)).andExpect(status().isBadRequest());
     }
 
     @Test
