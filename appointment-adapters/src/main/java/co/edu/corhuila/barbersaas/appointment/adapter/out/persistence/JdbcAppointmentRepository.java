@@ -60,6 +60,12 @@ public class JdbcAppointmentRepository implements AppointmentRepository, OutboxS
     }
 
     @Override
+    public Optional<Appointment> findOfClient(UUID clientId, UUID id) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM appointment.appointment WHERE client_id = ? AND id = ?",
+                (rs, n) -> map(rs), clientId, id).stream().findFirst();
+    }
+
+    @Override
     public Page<Appointment> page(UUID tenant, Query q, Page.Request page) {
         StringBuilder from = new StringBuilder("FROM appointment.appointment WHERE barbershop_id = ?");
         List<Object> args = new ArrayList<>(List.of(tenant));

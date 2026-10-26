@@ -41,6 +41,9 @@ public interface AppointmentRepository {
 
     Optional<Appointment> findById(UUID tenant, UUID id);
 
+    /** One appointment of the client, of any barbershop: scoped by the token's sub (DEC-APPT-11). */
+    Optional<Appointment> findOfClient(UUID clientId, UUID id);
+
     /** Most recent first: date, then start time, descending. */
     Page<Appointment> page(UUID tenant, Query query, Page.Request page);
 
