@@ -1,7 +1,9 @@
 package co.edu.corhuila.barbersaas.appointment.adapter.in.http;
 
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.ReviewUseCases.Listing;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.Review;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -44,6 +46,27 @@ final class Views {
             return new AppointmentView(a.id(), a.barbershopId(), a.clientId(), a.barberId(), a.serviceId(), a.slot().date(),
                     time(a.slot().start()), time(a.slot().end()), a.status().name(), a.price().cents(), a.notes(),
                     a.cancelledReason(), a.createdAt(), a.updatedAt(), a.createdBy(), a.couponId());
+        }
+    }
+
+    /** Review: table review without client_id, which is not public (DEC-APPT-11). */
+    record ReviewView(UUID id, UUID appointmentId, UUID barbershopId, UUID barberId, String clientDisplayName,
+                      int rating, String comment, Instant createdAt) {
+
+        static ReviewView of(Review r) {
+            return new ReviewView(r.id(), r.appointmentId(), r.barbershopId(), r.barberId(), r.clientDisplayName(),
+                    r.rating(), r.comment(), r.createdAt());
+        }
+    }
+
+    record Summary(Double averageRating, long reviewCount) { }
+
+    /** ReviewPage: the page of _shared.yaml plus the summary of the same filter. */
+    record ReviewPageView(List<ReviewView> data, Meta meta, Summary summary) {
+        static ReviewPageView of(Listing listing) {
+            PageView<ReviewView> page = PageView.of(listing.page(), ReviewView::of);
+            return new ReviewPageView(page.data(), page.meta(),
+                    new Summary(listing.summary().averageRating(), listing.summary().reviewCount()));
         }
     }
 }

@@ -33,3 +33,6 @@ appointment:
   barbershop-api-url: ${BARBERSHOP_API_URL:http://barbershop-api:8080}
   schedule-api-url: ${SCHEDULE_API_URL:http://schedule-api:8080}
   loyalty-api-url: ${LOYALTY_API_URL:http://loyalty-api:8080}
+  # The client's name of a review, read with this service's own token (ADR-014, DEC-APPT-11).
+  identity-auth-api-url: ${IDENTITY_AUTH_API_URL:http://identity-auth-api:8080}
+  service-token: ${SERVICE_TOKEN:}
