@@ -5,6 +5,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.ApplicationExc
 import co.edu.corhuila.barbersaas.appointment.application.port.in.ApplicationException.IdempotencyKeyReused;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.ApplicationException.NotFound;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyFailure;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyUnavailable;
 import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.BusinessRuleViolation;
 import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.InvalidStatusTransition;
 import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.InvalidValue;
@@ -78,6 +79,14 @@ public class ErrorHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ApiError> method(HttpRequestMethodNotSupportedException e) {
         return respond(HttpStatus.METHOD_NOT_ALLOWED, ApiError.of(ApiError.NOT_FOUND, "method not allowed on this route"));
+    }
+
+    /** identity-auth did not answer the name of a review: nothing was stored, the client can try again. */
+    @ExceptionHandler(DependencyUnavailable.class)
+    ResponseEntity<ApiError> unavailable(DependencyUnavailable e) {
+        log.error("dependency unavailable: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "30")
+                .body(ApiError.of(ApiError.SERVICE_UNAVAILABLE, "The service is temporarily unavailable"));
     }
 
     /** barbershop-api or schedule-api failed or was too slow: logged with the cause, neutral to the client. */
