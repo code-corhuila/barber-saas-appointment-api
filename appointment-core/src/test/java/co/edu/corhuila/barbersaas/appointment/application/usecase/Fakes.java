@@ -9,9 +9,13 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.Clock;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.IdGenerator;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.Idempotency;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.DependencyUnavailable;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.ReviewRepository;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.RewardCoupons;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.UserDirectory;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
+import co.edu.corhuila.barbersaas.appointment.domain.model.Review;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Slot;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -176,4 +180,56 @@ final class Fakes {
         }
     }
 
+    static final class Reviews implements ReviewRepository {
+        final Map<UUID, Review> byAppointment = new LinkedHashMap<>();
+        /** Simulates a concurrent review that was stored after the exists() check (uq_review_appointment). */
+        boolean loseTheRace;
+
+        @Override
+        public boolean exists(UUID appointmentId) {
+            return byAppointment.containsKey(appointmentId);
+        }
+
+        @Override
+        public void saveNew(Review review) {
+            if (loseTheRace || byAppointment.containsKey(review.appointmentId())) {
+                throw new AlreadyReviewed();
+            }
+            byAppointment.put(review.appointmentId(), review);
+        }
+
+        private List<Review> of(UUID barbershopId, UUID barberId) {
+            return byAppointment.values().stream()
+                    .filter(r -> r.barbershopId().equals(barbershopId))
+                    .filter(r -> barberId == null || barberId.equals(r.barberId()))
+                    .sorted(Comparator.comparing(Review::createdAt).reversed()).toList();
+        }
+
+        @Override
+        public Page<Review> page(UUID barbershopId, UUID barberId, Page.Request page) {
+            return Page.of(of(barbershopId, barberId), page);
+        }
+
+        @Override
+        public Summary summary(UUID barbershopId, UUID barberId) {
+            List<Review> all = of(barbershopId, barberId);
+            return new Summary(all.isEmpty() ? null : all.stream().mapToInt(Review::rating).average().orElseThrow(),
+                    all.size());
+        }
+    }
+
+    static final class Users implements UserDirectory {
+        final Map<UUID, String> names = new HashMap<>();
+        boolean down;
+        int calls;
+
+        @Override
+        public String fullName(UUID userId) {
+            calls++;
+            if (down) {
+                throw new DependencyUnavailable("identity-auth-api", "unreachable");
+            }
+            return names.getOrDefault(userId, "Ana Pérez");
+        }
+    }
 }
