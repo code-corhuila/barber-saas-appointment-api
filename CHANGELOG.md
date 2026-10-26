@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130
+User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130, code-corhuila/barber-saas-docs#131
 
 ### Added
 
@@ -16,6 +16,7 @@ User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs
 - review: review a completed appointment once and list a barbershop's reviews
 - http: read the client's name from identity-auth with the service token
 - http: expose the review of an appointment and the public reviews list
+- jobs: write the one-hour reminder once per appointment (AppointmentReminderDue version 2 with window)
 
 ## [2.0.0] - 2026-10-08
 
