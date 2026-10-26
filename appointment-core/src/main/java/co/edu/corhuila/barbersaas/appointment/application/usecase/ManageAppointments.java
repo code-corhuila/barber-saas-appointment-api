@@ -43,6 +43,8 @@ public class ManageAppointments implements AppointmentUseCases {
     static final String BOOK_OPERATION = "POST /api/v1/appointments";
     private static final String SLOT_TAKEN = "The barber already has an appointment at that time";
     private static final String COUPON_TAKEN = "The reward coupon was applied to another booking; book again";
+    /** The text DEC-APPT-10 fixes: the app shows it to the client as it comes. */
+    static final String NOT_TAKING_BOOKINGS = "Esta barbería no está recibiendo reservas";
 
     private final AppointmentRepository appointments;
     private final BarbershopCatalog catalog;
@@ -80,8 +82,12 @@ public class ManageAppointments implements AppointmentUseCases {
             return retried.get();
         }
 
-        CatalogService service = catalog.service(caller, c.serviceId()).orElseThrow(() -> new NotFound("Service"));
+        // DEC-APPT-10: read first, so a suspended barbershop answers this rule and not a hidden service.
         Policy policy = catalog.policy(caller);
+        if (!policy.takesBookings()) {
+            throw new BusinessRuleViolation(NOT_TAKING_BOOKINGS);
+        }
+        CatalogService service = catalog.service(caller, c.serviceId()).orElseThrow(() -> new NotFound("Service"));
         Instant now = clock.now();
         Slot slot = Slot.of(c.date(), c.startTime(), service.durationMinutes());
         // FR-010, DEC-APPT-09: the client's active coupon pays the appointment; a walk-in has none.
