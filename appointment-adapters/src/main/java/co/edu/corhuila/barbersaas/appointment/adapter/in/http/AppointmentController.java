@@ -9,6 +9,8 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUse
 import co.edu.corhuila.barbersaas.appointment.application.port.in.AppointmentUseCases.Filter;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Created;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
+import co.edu.corhuila.barbersaas.appointment.application.port.in.ReviewUseCases;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
 import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,9 +39,11 @@ public class AppointmentController {
     private static final Set<String> CANCEL_FIELDS = Set.of("reason");
 
     private final AppointmentUseCases appointments;
+    private final ReviewUseCases reviews;
 
-    public AppointmentController(AppointmentUseCases appointments) {
+    public AppointmentController(AppointmentUseCases appointments, ReviewUseCases reviews) {
         this.appointments = appointments;
+        this.reviews = reviews;
     }
 
     /** bookAppointment: 201 with Location, or 200 when the same Idempotency-Key is retried. */
@@ -68,12 +72,15 @@ public class AppointmentController {
                                           @RequestParam(required = false) UUID barberId,
                                           @RequestParam(required = false) String date) {
         Filter filter = new Filter(status(status), barberId, JsonBody.parseDate("date", date));
-        return PageView.of(appointments.list(caller, filter, Requests.page(page, limit)), AppointmentView::of);
+        Page<Appointment> found = appointments.list(caller, filter, Requests.page(page, limit));
+        Set<UUID> reviewed = reviews.reviewedAmong(found.items());
+        return PageView.of(found, a -> AppointmentView.of(a, reviewed.contains(a.id())));
     }
 
     @GetMapping("/{id}")
     public AppointmentView get(@RequestAttribute(AuthFilter.CALLER_ATTRIBUTE) Caller caller, @PathVariable UUID id) {
-        return AppointmentView.of(appointments.get(caller, id));
+        Appointment a = appointments.get(caller, id);
+        return AppointmentView.of(a, reviews.reviewedAmong(List.of(a)).contains(a.id()));
     }
 
     @PostMapping("/{id}/confirm")
