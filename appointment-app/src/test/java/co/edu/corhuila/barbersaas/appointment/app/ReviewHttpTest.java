@@ -64,6 +64,8 @@ class ReviewHttpTest extends HttpTest {
     @Test
     void theClientReviewsTheirCompletedAppointmentOnce() throws Exception {
         String id = completed(barber, "09:00");
+        http.perform(get("/api/v1/appointments/" + id).header("Authorization", client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.reviewed").value(false));
 
         review(client, id, "{\"rating\":5,\"comment\":\"Excelente corte, muy puntual\"}")
                 .andExpect(status().isCreated())
@@ -74,6 +76,11 @@ class ReviewHttpTest extends HttpTest {
                 .andExpect(jsonPath("$.rating").value(5))
                 .andExpect(jsonPath("$.comment").value("Excelente corte, muy puntual"))
                 .andExpect(jsonPath("$.clientId").doesNotExist());
+
+        http.perform(get("/api/v1/appointments/" + id).header("Authorization", client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.reviewed").value(true));
+        http.perform(get("/api/v1/appointments").header("Authorization", client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].reviewed").value(true));
 
         review(client, id, "{\"rating\":1}")
                 .andExpect(status().isUnprocessableEntity())
