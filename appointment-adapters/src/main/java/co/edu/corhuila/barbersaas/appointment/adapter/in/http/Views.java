@@ -35,17 +35,22 @@ final class Views {
 
     /**
      * Appointment: every field maps to a column of appointment.appointment. barbershopId (DEC-APPT-06)
-     * and couponId (DEC-APPT-09) are output only: no request accepts them.
+     * and couponId (DEC-APPT-09) are output only: no request accepts them. reviewed (DEC-APPT-11) is
+     * computed from the review table.
      */
     record AppointmentView(UUID id, UUID barbershopId, UUID clientId, UUID barberId, UUID serviceId, LocalDate date,
                            String startTime, String endTime, String status, long priceAtBookingCents, String notes,
                            String cancelledReason, Instant createdAt, Instant updatedAt, UUID createdBy,
-                           UUID couponId) {
+                           UUID couponId, boolean reviewed) {
 
         static AppointmentView of(Appointment a) {
+            return of(a, false);
+        }
+
+        static AppointmentView of(Appointment a, boolean reviewed) {
             return new AppointmentView(a.id(), a.barbershopId(), a.clientId(), a.barberId(), a.serviceId(), a.slot().date(),
                     time(a.slot().start()), time(a.slot().end()), a.status().name(), a.price().cents(), a.notes(),
-                    a.cancelledReason(), a.createdAt(), a.updatedAt(), a.createdBy(), a.couponId());
+                    a.cancelledReason(), a.createdAt(), a.updatedAt(), a.createdBy(), a.couponId(), reviewed);
         }
     }
 

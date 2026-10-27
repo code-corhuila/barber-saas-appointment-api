@@ -2,6 +2,8 @@ package co.edu.corhuila.barbersaas.appointment.application.port.out;
 
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Review;
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -21,6 +23,9 @@ public interface ReviewRepository {
     record Summary(Double averageRating, long reviewCount) { }
 
     boolean exists(UUID appointmentId);
+
+    /** The ones of {@code appointmentIds} that already have a review. */
+    Set<UUID> reviewedAmong(Collection<UUID> appointmentIds);
 
     /** @throws AlreadyReviewed when the appointment already has one */
     void saveNew(Review review);
