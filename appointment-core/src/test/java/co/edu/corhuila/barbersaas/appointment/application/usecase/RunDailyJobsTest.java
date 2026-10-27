@@ -8,6 +8,7 @@ import co.edu.corhuila.barbersaas.appointment.application.port.in.ApplicationExc
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Caller.Role;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.DailyJobUseCases.JobResult;
+import co.edu.corhuila.barbersaas.appointment.application.port.out.BarbershopZones;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.DailyJobsStore;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.OutboxEvent;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
@@ -112,6 +113,32 @@ class RunDailyJobsTest {
         OutboxEvent e = repository.outbox.get(0);
         assertEquals("DAY_BEFORE", e.payload().get("window"));
         assertEquals(2, Events.version(Events.REMINDER_DUE));
+    }
+
+    @Test
+    void theReminderNamesTheBarbershopAskedOncePerCall() {
+        Map<UUID, Integer> nameCalls = new HashMap<>();
+        RunDailyJobs named = new RunDailyJobs(store, repository, new BarbershopZones() {
+            public ZoneId zoneOf(UUID shop) {
+                return ZoneId.of("America/Bogota");
+            }
+
+            public String nameOf(UUID shop) {
+                nameCalls.merge(shop, 1, Integer::sum);
+                return shop.equals(BOGOTA) ? "El Clasico" : null;
+            }
+        }, () -> NOW, new Fakes.Sequence());
+        stored(BOGOTA, BOGOTA_TODAY.plusDays(1), AppointmentStatus.CONFIRMED);
+        stored(BOGOTA, BOGOTA_TODAY.plusDays(1), AppointmentStatus.CONFIRMED);
+        stored(AUCKLAND, BOGOTA_TODAY.plusDays(1), AppointmentStatus.CONFIRMED);
+
+        named.writeDueReminders(worker, ReminderWindow.DAY_BEFORE, 20);
+
+        Map<Object, Long> byName = new HashMap<>();
+        repository.outbox.forEach(e -> byName.merge(String.valueOf(e.payload().get("barbershopName")), 1L, Long::sum));
+        assertEquals(Map.of("El Clasico", 2L, "null", 1L), byName);
+        assertTrue(repository.outbox.stream().allMatch(e -> e.payload().containsKey("barbershopName")));
+        assertEquals(1, nameCalls.get(BOGOTA));
     }
 
     /** 22:00 in Bogotá now: a start at 23:00 is 60 minutes away, at 22:55 55, at 23:05 65. */
