@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -65,8 +66,9 @@ public class RunDailyJobs implements DailyJobUseCases {
             candidates = jobs.confirmedBetween(utcToday, utcToday.plusDays(2), window);
             due = a -> a.slot().date().equals(LocalDate.ofInstant(now, zone(a, zoneOf)).plusDays(1));
         }
-        return run(candidates, due, limit,
-                a -> jobs.markReminderSent(a.id(), window, Events.reminder(a, window, ids, now), now));
+        Map<UUID, Optional<String>> nameOf = new HashMap<>();
+        return run(candidates, due, limit, a -> jobs.markReminderSent(a.id(), window,
+                Events.reminder(a, window, name(a, nameOf), ids, now), now));
     }
 
     @Override
@@ -100,6 +102,11 @@ public class RunDailyJobs implements DailyJobUseCases {
             }
         }
         return new JobResult(processed, false);
+    }
+
+    /** The barbershop's name, asked once per barbershop and call, only for the reminders due. */
+    private String name(Appointment a, Map<UUID, Optional<String>> nameOf) {
+        return nameOf.computeIfAbsent(a.barbershopId(), id -> Optional.ofNullable(zones.nameOf(id))).orElse(null);
     }
 
     /** The barbershop's time zone, asked once per barbershop and call. */

@@ -1,6 +1,7 @@
 package co.edu.corhuila.barbersaas.appointment.adapter.out.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -167,6 +168,18 @@ class ApiClientsTest {
         assertEquals(ZoneId.of("Pacific/Auckland"), new BarbershopZonesClient(base).zoneOf(shop));
         assertEquals("null", seenHeaders.get("Authorization"));
         assertEquals(ZoneId.of("America/Bogota"), new BarbershopZonesClient(base).zoneOf(UUID.randomUUID()));
+    }
+
+    /** The reminder names the barbershop from the same public detail; null when it is gone or unreachable. */
+    @Test
+    void theNameOfABarbershopComesFromItsPublicDetail() {
+        UUID shop = UUID.randomUUID();
+        answer("/api/v1/barbershops/" + shop, "{\"id\":\"" + shop + "\",\"name\":\"El Clasico\"}");
+
+        assertEquals("El Clasico", new BarbershopZonesClient(base).nameOf(shop));
+        assertNull(new BarbershopZonesClient(base).nameOf(UUID.randomUUID()));
+        server.stop(0);
+        assertNull(new BarbershopZonesClient(base).nameOf(shop));
     }
 
     // --- loyalty-api: the client's active reward coupon (DEC-APPT-09) ---------------------------

@@ -60,11 +60,16 @@ final class Events {
         return new OutboxEvent(base.id(), base.aggregateId(), COMPLETED, payload, now);
     }
 
-    /** AppointmentReminderDue adds its window (DEC-APPT-12): the day before or the hour before. */
-    static OutboxEvent reminder(Appointment a, ReminderWindow window, IdGenerator ids, Instant now) {
+    /**
+     * AppointmentReminderDue adds its window (DEC-APPT-12), the day before or the hour before, and the
+     * barbershop's name (null when it could not be read), so the reminder can say where.
+     */
+    static OutboxEvent reminder(Appointment a, ReminderWindow window, String barbershopName, IdGenerator ids,
+                                Instant now) {
         OutboxEvent base = of(REMINDER_DUE, a, ids, now);
         Map<String, Object> payload = new LinkedHashMap<>(base.payload());
         payload.put("window", window.name());
+        payload.put("barbershopName", barbershopName);
         return new OutboxEvent(base.id(), base.aggregateId(), REMINDER_DUE, payload, now);
     }
 
