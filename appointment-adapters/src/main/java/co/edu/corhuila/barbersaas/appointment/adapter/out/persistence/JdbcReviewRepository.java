@@ -8,7 +8,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +38,16 @@ public class JdbcReviewRepository implements ReviewRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM appointment.review WHERE appointment_id = ?)", Boolean.class,
                 appointmentId));
+    }
+
+    @Override
+    public Set<UUID> reviewedAmong(Collection<UUID> appointmentIds) {
+        if (appointmentIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT appointment_id FROM appointment.review WHERE appointment_id = ANY (?)", UUID.class,
+                (Object) appointmentIds.toArray(UUID[]::new)));
     }
 
     @Override
