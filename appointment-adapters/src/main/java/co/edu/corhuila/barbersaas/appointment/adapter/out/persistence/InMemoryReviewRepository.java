@@ -3,11 +3,14 @@ package co.edu.corhuila.barbersaas.appointment.adapter.out.persistence;
 import co.edu.corhuila.barbersaas.appointment.application.port.in.Page;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.ReviewRepository;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Review;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** Used when DATABASE_URL is empty. putIfAbsent keeps one review per appointment, as uq_review_appointment does. */
 public class InMemoryReviewRepository implements ReviewRepository {
@@ -17,6 +20,11 @@ public class InMemoryReviewRepository implements ReviewRepository {
     @Override
     public boolean exists(UUID appointmentId) {
         return byAppointment.containsKey(appointmentId);
+    }
+
+    @Override
+    public Set<UUID> reviewedAmong(Collection<UUID> appointmentIds) {
+        return appointmentIds.stream().filter(byAppointment::containsKey).collect(Collectors.toSet());
     }
 
     @Override
