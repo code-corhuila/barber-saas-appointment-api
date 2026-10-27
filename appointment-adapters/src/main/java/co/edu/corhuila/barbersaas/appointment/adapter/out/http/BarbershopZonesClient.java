@@ -10,7 +10,8 @@ import java.util.UUID;
  * BarbershopZones over the public detail of barbershop-service.yaml (getBarbershopById, anonymous,
  * DEC-SHOP-02): the daily jobs run with the worker's token, which barbershop-api does not take, and
  * need only the time zone. A barbershop that is no longer visible (404, suspended or cancelled) is
- * judged in the platform's zone, so its appointments still leave the agenda.
+ * judged in the platform's zone, so its appointments still leave the agenda. Its name, for the
+ * reminder, is read from the same detail and is null when it cannot be read.
  */
 public class BarbershopZonesClient implements BarbershopZones {
 
@@ -34,5 +35,16 @@ public class BarbershopZonesClient implements BarbershopZones {
                     }
                 })
                 .orElse(PLATFORM_ZONE);
+    }
+
+    @Override
+    public String nameOf(UUID barbershopId) {
+        try {
+            return api.getPublic("/api/v1/barbershops/" + barbershopId)
+                    .map(shop -> shop.path("name").asText(null))
+                    .orElse(null);
+        } catch (DependencyFailure e) {
+            return null;
+        }
     }
 }
