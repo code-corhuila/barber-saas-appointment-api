@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,6 +95,17 @@ class ManageReviewsTest {
         assertEquals(5, r.rating());
         assertEquals("Excelente corte", r.comment());
         assertEquals(r, reviews.byAppointment.get(a.id()));
+    }
+
+    @Test
+    void onlyTheReviewedCompletedAppointmentsAreMarked() {
+        Appointment reviewed = completed(BARBER, LocalTime.of(9, 0));
+        Appointment notYet = completed(BARBER, LocalTime.of(9, 30));
+        Appointment pending = booked(BARBER, LocalTime.of(10, 0));
+        manage.review(client, reviewed.id(), 4, null);
+
+        assertEquals(Set.of(reviewed.id()), manage.reviewedAmong(List.of(reviewed, notYet, pending)));
+        assertEquals(Set.of(), manage.reviewedAmong(List.of(pending)));
     }
 
     @Test
