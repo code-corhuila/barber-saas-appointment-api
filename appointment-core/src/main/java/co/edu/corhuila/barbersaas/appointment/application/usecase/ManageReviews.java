@@ -13,8 +13,12 @@ import co.edu.corhuila.barbersaas.appointment.application.port.out.ReviewReposit
 import co.edu.corhuila.barbersaas.appointment.application.port.out.ReviewRepository.Summary;
 import co.edu.corhuila.barbersaas.appointment.application.port.out.UserDirectory;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Appointment;
+import co.edu.corhuila.barbersaas.appointment.domain.model.AppointmentStatus;
 import co.edu.corhuila.barbersaas.appointment.domain.model.DomainException.BusinessRuleViolation;
 import co.edu.corhuila.barbersaas.appointment.domain.model.Review;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** DEC-APPT-11: only the client of a completed appointment reviews it, once. */
@@ -36,6 +40,14 @@ public class ManageReviews implements ReviewUseCases {
         this.users = users;
         this.clock = clock;
         this.ids = ids;
+    }
+
+    @Override
+    public Set<UUID> reviewedAmong(Collection<Appointment> appointments) {
+        // Only a COMPLETED appointment can have a review (DEC-APPT-11): the others are not looked up.
+        List<UUID> completed = appointments.stream().filter(a -> a.status() == AppointmentStatus.COMPLETED)
+                .map(Appointment::id).toList();
+        return completed.isEmpty() ? Set.of() : reviews.reviewedAmong(completed);
     }
 
     @Override

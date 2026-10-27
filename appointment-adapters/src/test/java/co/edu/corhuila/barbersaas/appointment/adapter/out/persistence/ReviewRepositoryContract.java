@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -69,6 +70,16 @@ abstract class ReviewRepositoryContract {
 
         assertTrue(reviews().exists(a.id()));
         assertEquals(List.of(r), reviews().page(shop, null, new Page.Request(1, 20)).items());
+    }
+
+    @Test
+    void onlyTheAppointmentsWithAReviewAreReturned() {
+        Appointment reviewed = appointment(barber);
+        Appointment notYet = appointment(barber);
+        reviews().saveNew(review(reviewed, 4, now));
+
+        assertEquals(Set.of(reviewed.id()), reviews().reviewedAmong(List.of(reviewed.id(), notYet.id(), UUID.randomUUID())));
+        assertEquals(Set.of(), reviews().reviewedAmong(List.of()));
     }
 
     @Test
