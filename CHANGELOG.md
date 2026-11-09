@@ -5,18 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-11-05
 
-User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130, code-corhuila/barber-saas-docs#131
+User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130, code-corhuila/barber-saas-docs#131, code-corhuila/barber-saas-docs#145
 
 ### Added
 
+- http: read whether the token's barbershop takes bookings
 - booking: refuse a booking at a suspended or cancelled barbershop
 - domain: add the review of a completed appointment
+- persistence: find one appointment of a client in any barbershop
 - review: review a completed appointment once and list a barbershop's reviews
+- persistence: store and read the reviews
 - http: read the client's name from identity-auth with the service token
 - http: expose the review of an appointment and the public reviews list
 - jobs: write the one-hour reminder once per appointment (AppointmentReminderDue version 2 with window)
+- reminders: name the barbershop in AppointmentReminderDue
+- reviews: say whether each appointment was reviewed
+
+### Documentation
+
+- readme: describe the suspended-barbershop rule
+- readme: describe the reviews and the public list
+- readme: describe the one-hour reminder window
 
 ## [2.0.0] - 2026-10-08
 
@@ -119,4 +130,5 @@ User stories: code-corhuila/barber-saas-docs#4, code-corhuila/barber-saas-docs#5
 - env: list every variable without real values
 - use the new repository name barber-saas-infra-postgres
 
+[3.0.0]: https://github.com/code-corhuila/barber-saas-appointment-api/releases/tag/v3.0.0
 [2.0.0]: https://github.com/code-corhuila/barber-saas-appointment-api/releases/tag/v2.0.0
