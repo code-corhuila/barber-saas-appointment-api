@@ -56,13 +56,25 @@ abstract class HttpTest {
 
     /** "Bearer ..." for a service token: role SERVICE, the service's name as sub, no barbershop. */
     static String serviceBearer(String service) {
-        return signed(service, "SERVICE", null);
+        return scopedBearer(service, "barber-saas-worker".equals(service) ? WORKER_SCOPES : null);
+    }
+
+    /** The scopes of WORKER_APPOINTMENT_TOKEN (dev-keys.sh; 07-api/authentication.md, Scopes). */
+    static final String WORKER_SCOPES = "outbox:relay jobs:run";
+
+    /** A service token that grants only {@code scope} (space-separated, null for none). */
+    static String scopedBearer(String service, String scope) {
+        return signed(service, "SERVICE", null, scope == null ? "" : ",\"scope\":\"" + scope + "\"");
     }
 
     private static String signed(String subject, String role, UUID barbershopId) {
+        return signed(subject, role, barbershopId, "");
+    }
+
+    private static String signed(String subject, String role, UUID barbershopId, String extra) {
         long now = Instant.now().getEpochSecond();
         String claims = "{\"iss\":\"barber-saas-identity-auth-api\",\"sub\":\"" + subject + "\",\"role\":\"" + role + "\""
-                + (barbershopId == null ? "" : ",\"barbershopId\":\"" + barbershopId + "\"")
+                + (barbershopId == null ? "" : ",\"barbershopId\":\"" + barbershopId + "\"") + extra
                 + ",\"iat\":" + now + ",\"exp\":" + (now + 600) + "}";
         try {
             String input = b64("{\"alg\":\"RS256\",\"typ\":\"JWT\",\"kid\":\"dev-1\"}") + "." + b64(claims);

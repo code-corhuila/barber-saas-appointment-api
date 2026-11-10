@@ -39,7 +39,8 @@ class RunDailyJobsTest {
     static final UUID BOGOTA = UUID.randomUUID();
     static final UUID AUCKLAND = UUID.randomUUID();
 
-    final Caller worker = new Caller("barber-saas-worker", Role.SERVICE, null, "token");
+    final Caller worker = new Caller("barber-saas-worker", Role.SERVICE, null, "token",
+            Set.of("outbox:relay", "jobs:run"));                       // WORKER_APPOINTMENT_TOKEN of dev-keys.sh
     final Fakes.Repository repository = new Fakes.Repository();
     final Jobs store = new Jobs();
     final Map<UUID, Integer> zoneCalls = new HashMap<>();
@@ -217,8 +218,11 @@ class RunDailyJobsTest {
     void onlyTheWorkerRunsTheJobs() {
         Caller admin = new Caller(UUID.randomUUID().toString(), Role.ADMIN_BARBERSHOP, BOGOTA, "t");
         Caller other = new Caller("barber-saas-schedule-api", Role.SERVICE, null, "t");
+        Caller expireOnly = new Caller("barber-saas-worker", Role.SERVICE, null, "t", Set.of("subscriptions:expire"));   // docs#159
+        Caller relayOnly = new Caller("barber-saas-worker", Role.SERVICE, null, "t", Set.of("outbox:relay"));
+        Caller noScope = new Caller("barber-saas-worker", Role.SERVICE, null, "t");
 
-        for (Caller caller : List.of(admin, other)) {
+        for (Caller caller : List.of(admin, other, expireOnly, relayOnly, noScope)) {
             assertThrows(Forbidden.class, () -> jobs.writeDueReminders(caller, ReminderWindow.DAY_BEFORE, 20));
             assertThrows(Forbidden.class, () -> jobs.writeDueReminders(caller, ReminderWindow.HOUR_BEFORE, 20));
             assertThrows(Forbidden.class, () -> jobs.markNoShows(caller, 20));

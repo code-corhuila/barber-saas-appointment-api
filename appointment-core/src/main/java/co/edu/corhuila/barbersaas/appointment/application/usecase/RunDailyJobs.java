@@ -43,13 +43,16 @@ public class RunDailyJobs implements DailyJobUseCases {
         this.ids = ids;
     }
 
+    /** The scope of the daily jobs (07-api/authentication.md, Scopes; docs#159). */
+    static final String JOBS_SCOPE = "jobs:run";
+
     /** The one-hour reminder goes to the appointments that start between these, from now (DEC-APPT-12). */
     static final Duration HOUR_FROM = Duration.ofMinutes(55);
     static final Duration HOUR_TO = Duration.ofMinutes(65);
 
     @Override
     public JobResult writeDueReminders(Caller caller, ReminderWindow window, int limit) {
-        caller.requireService(RelayOutbox.WORKER);
+        caller.requireService(RelayOutbox.WORKER, JOBS_SCOPE);
         Instant now = clock.now();
         LocalDate utcToday = LocalDate.ofInstant(now, ZoneOffset.UTC);
         Map<UUID, ZoneId> zoneOf = new HashMap<>();
@@ -73,7 +76,7 @@ public class RunDailyJobs implements DailyJobUseCases {
 
     @Override
     public JobResult markNoShows(Caller caller, int limit) {
-        caller.requireService(RelayOutbox.WORKER);
+        caller.requireService(RelayOutbox.WORKER, JOBS_SCOPE);
         Instant now = clock.now();
         LocalDate utcToday = LocalDate.ofInstant(now, ZoneOffset.UTC);
         List<Appointment> candidates = jobs.confirmedBetween(null, utcToday, null);

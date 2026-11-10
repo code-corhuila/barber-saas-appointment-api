@@ -101,6 +101,21 @@ class InternalOutboxHttpTest extends HttpTest {
     }
 
     @Test
+    void eachWorkerTokenGetsInOnlyWithTheOutboxRelayScope() throws Exception {              // docs#159
+        String id = bookedEvent();
+
+        for (String scope : new String[] {"subscriptions:expire", "jobs:run", null}) {
+            String token = scopedBearer("barber-saas-worker", scope);
+            http.perform(get(OUTBOX).header("Authorization", token)).andExpect(status().isForbidden());
+            http.perform(post(OUTBOX + "/" + id + "/published").header("Authorization", token)).andExpect(status().isForbidden());
+        }
+        http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
+                .andExpect(jsonPath("$.data[*].id", hasItem(id)));                // still pending: nothing was confirmed
+        http.perform(get(OUTBOX).header("Authorization", scopedBearer("barber-saas-worker", "outbox:relay")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void onlyTheWorkersServiceTokenGetsIn() throws Exception {
         String id = bookedEvent();
 

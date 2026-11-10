@@ -11,7 +11,7 @@ import java.util.UUID;
  * cases: the adapters pass it on to barbershop-api and schedule-api, which validate it again and
  * apply its tenant themselves. It is never logged.
  */
-public record Caller(String subject, Role role, UUID barbershopId, String credential) {
+public record Caller(String subject, Role role, UUID barbershopId, String credential, Set<String> scopes) {
 
     /** The four user roles of identity-auth plus SERVICE, for the tokens of worker and workflow. */
     public enum Role { SUPER_ADMIN, ADMIN_BARBERSHOP, BARBER, CLIENT, SERVICE }
@@ -19,6 +19,12 @@ public record Caller(String subject, Role role, UUID barbershopId, String creden
     public Caller {
         Objects.requireNonNull(subject);
         Objects.requireNonNull(role);
+        scopes = scopes == null ? Set.of() : Set.copyOf(scopes);
+    }
+
+    /** A caller whose token grants no scope. */
+    public Caller(String subject, Role role, UUID barbershopId, String credential) {
+        this(subject, role, barbershopId, credential, Set.of());
     }
 
     /** The tenant every scoped read and write filters by; SUPER_ADMIN and a client without one are refused. */
@@ -46,6 +52,17 @@ public record Caller(String subject, Role role, UUID barbershopId, String creden
     public void requireService(String service) {
         if (role != Role.SERVICE || !subject.equals(service)) {
             throw new Forbidden("Only " + service + " can do this");
+        }
+    }
+
+    /**
+     * The same, and the token must grant {@code scope}, the operation being called (07-api/authentication.md,
+     * Scopes): a worker token for another operation, such as {@code subscriptions:expire}, is refused (docs#159).
+     */
+    public void requireService(String service, String scope) {
+        requireService(service);
+        if (!scopes.contains(scope)) {
+            throw new Forbidden("This token does not grant " + scope);
         }
     }
 

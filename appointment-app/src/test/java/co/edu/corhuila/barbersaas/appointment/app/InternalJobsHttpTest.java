@@ -148,6 +148,18 @@ class InternalJobsHttpTest extends HttpTest {
     }
 
     @Test
+    void eachWorkerTokenRunsTheJobsOnlyWithTheJobsRunScope() throws Exception {              // docs#159
+        for (String path : new String[] {"/internal/v1/appointments/reminders-due", "/internal/v1/appointments/no-shows"}) {
+            for (String scope : new String[] {"subscriptions:expire", "outbox:relay", null}) {
+                http.perform(post(path).header("Authorization", scopedBearer("barber-saas-worker", scope)))
+                        .andExpect(status().isForbidden());
+            }
+            http.perform(post(path).header("Authorization", scopedBearer("barber-saas-worker", "jobs:run")))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void onlyTheWorkerRunsTheJobsAndTheLimitIsChecked() throws Exception {
         for (String path : new String[] {"/internal/v1/appointments/reminders-due", "/internal/v1/appointments/no-shows"}) {
             http.perform(post(path).header("Authorization", bearer("ADMIN_BARBERSHOP", shop))).andExpect(status().isForbidden());
