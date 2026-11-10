@@ -70,7 +70,7 @@ class InternalJobsHttpTest extends HttpTest {
 
     /** The windows of the pending AppointmentReminderDue of one appointment, with envelope version 2. */
     private java.util.List<String> windows(String appointmentId) throws Exception {
-        JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "100")
+        JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "50")
                 .header("Authorization", worker)).andReturn().getResponse().getContentAsString()).get("data");
         java.util.List<String> windows = new java.util.ArrayList<>();
         for (JsonNode e : pending) {
@@ -85,7 +85,7 @@ class InternalJobsHttpTest extends HttpTest {
     }
 
     private long reminders(String appointmentId) throws Exception {
-        JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "100")
+        JsonNode pending = json.readTree(http.perform(get("/internal/v1/outbox-events").param("limit", "50")
                 .header("Authorization", worker)).andReturn().getResponse().getContentAsString()).get("data");
         long count = 0;
         for (JsonNode e : pending) {
