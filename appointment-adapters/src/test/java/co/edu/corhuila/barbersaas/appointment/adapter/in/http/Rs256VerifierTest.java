@@ -71,6 +71,15 @@ class Rs256VerifierTest {
     }
 
     @Test
+    void a_service_token_carries_its_space_separated_scopes() throws Exception {         // docs#159
+        String claims = claims("SERVICE", null, NOW.getEpochSecond() + 60);
+
+        assertEquals(java.util.Set.of("outbox:relay", "jobs:run"), verifier.verify(token(KEYS, "RS256",
+                claims.replace("}", ",\"scope\":\"outbox:relay  jobs:run\"}")), NOW).scopes());
+        assertEquals(java.util.Set.of(), verifier.verify(token(KEYS, "RS256", claims), NOW).scopes());
+    }
+
+    @Test
     void the_caller_carries_the_token_to_pass_on_to_other_services() throws Exception {
         String token = token(KEYS, "RS256", claims("BARBER", UUID.randomUUID().toString(), NOW.getEpochSecond() + 60));
 
