@@ -42,7 +42,7 @@ class InternalOutboxHttpTest extends HttpTest {
                                 + LocalDate.now().plusDays(10) + "\",\"startTime\":\"09:00\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String appointmentId = json.readTree(body).get("id").asText();
-        JsonNode pending = json.readTree(http.perform(get(OUTBOX).param("limit", "100").header("Authorization", worker))
+        JsonNode pending = json.readTree(http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
                 .andReturn().getResponse().getContentAsString()).get("data");
         for (JsonNode e : pending) {
             if (e.get("aggregateId").asText().equals(appointmentId)) {
@@ -56,7 +56,7 @@ class InternalOutboxHttpTest extends HttpTest {
     void theWorkerReadsTheEnvelopeOfEachPendingEvent() throws Exception {
         String id = bookedEvent();
 
-        http.perform(get(OUTBOX).param("limit", "100").header("Authorization", worker))
+        http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].type").value("AppointmentCreated"))
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].version").value(2))
@@ -66,8 +66,26 @@ class InternalOutboxHttpTest extends HttpTest {
                 .andExpect(jsonPath("$.data[?(@.id == '" + id + "')].payload.status").value("PENDING"));
         http.perform(get(OUTBOX).param("limit", "1").header("Authorization", worker))
                 .andExpect(jsonPath("$.data.length()").value(lessThanOrEqualTo(1)));
-        http.perform(get(OUTBOX).param("limit", "101").header("Authorization", worker))
+        http.perform(get(OUTBOX).param("limit", "51").header("Authorization", worker))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void theOutboxIsReadInBatchesOfAtMostFifty() throws Exception {      // docs#160
+        http.perform(get(OUTBOX).param("limit", "51").header("Authorization", worker))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details[0].field").value("limit"));
+        http.perform(get(OUTBOX).param("limit", "0").header("Authorization", worker)).andExpect(status().isBadRequest());
+        for (int i = 0; i < 51; i++) {
+            UUID other = UUID.randomUUID();
+            OTHER_APIS.barbers.put(other, shop);
+            http.perform(post("/api/v1/appointments").header("Authorization", bearer("CLIENT", shop))
+                            .header("Idempotency-Key", "key-" + UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"barberId\":\"" + other + "\",\"serviceId\":\"" + service + "\",\"date\":\""
+                                    + LocalDate.now().plusDays(10) + "\",\"startTime\":\"09:00\"}"))
+                    .andExpect(status().isCreated());
+        }
+        http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(50));
     }
 
     @Test
@@ -78,7 +96,7 @@ class InternalOutboxHttpTest extends HttpTest {
                 .andExpect(status().isNoContent());
         http.perform(post(OUTBOX + "/" + id + "/published").header("Authorization", worker))
                 .andExpect(status().isNoContent());
-        http.perform(get(OUTBOX).param("limit", "100").header("Authorization", worker))
+        http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
                 .andExpect(jsonPath("$.data[*].id", not(hasItem(id))));
         http.perform(post(OUTBOX + "/" + UUID.randomUUID() + "/published").header("Authorization", worker))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.error").value("NOT_FOUND"));
@@ -91,7 +109,7 @@ class InternalOutboxHttpTest extends HttpTest {
         http.perform(post(OUTBOX + "/" + id + "/failed").header("Authorization", worker)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"loyalty-api 422 UNKNOWN_EVENT_TYPE\"}"))
                 .andExpect(status().isNoContent());
-        http.perform(get(OUTBOX).param("limit", "100").header("Authorization", worker))
+        http.perform(get(OUTBOX).param("limit", "50").header("Authorization", worker))
                 .andExpect(jsonPath("$.data[*].id", not(hasItem(id))));
         http.perform(post(OUTBOX + "/" + id + "/failed").header("Authorization", worker)
                 .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
