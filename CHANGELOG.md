@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0] - 2026-11-05
 
-User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130, code-corhuila/barber-saas-docs#131, code-corhuila/barber-saas-docs#145
+User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs#130, code-corhuila/barber-saas-docs#131, code-corhuila/barber-saas-docs#145, code-corhuila/barber-saas-docs#159, code-corhuila/barber-saas-docs#160
 
 ### Added
 
@@ -22,6 +22,11 @@ User stories: code-corhuila/barber-saas-docs#129, code-corhuila/barber-saas-docs
 - jobs: write the one-hour reminder once per appointment (AppointmentReminderDue version 2 with window)
 - reminders: name the barbershop in AppointmentReminderDue
 - reviews: say whether each appointment was reviewed
+
+### Security
+
+- outbox: read at most fifty pending events per call
+- auth: require the scope of each internal worker operation
 
 ### Documentation
 
